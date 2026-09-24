@@ -5,11 +5,26 @@
     "name": "",
     "klasse": "",
     "stufe": "",
-    "notiz": ""
+    "notiz": "",
+    "qualstufe": "",
+    "paragon": ""
   },
   "einstellungen": {
     "warnTageBuildAlter": 14
   },
+  "inventar": {
+    "kopf": null,
+    "brust": null,
+    "haende": null,
+    "beine": null,
+    "fuesse": null,
+    "amulett": null,
+    "ring1": null,
+    "ring2": null,
+    "waffe": null,
+    "fokus": null
+  },
+  "bestand": {},
   "builds": [],
   "aktiverBuild": "",
   "zielBuild": "",

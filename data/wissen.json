@@ -1,57 +1,199 @@
 {
   "_info": "Spielwissen – für alle Nutzer gleich. Wird bei einem Update KOMPLETT ersetzt. Persönliches gehört in profil.json.",
   "schemaVersion": 2,
-  "version": "1",
+  "version": "2",
   "stand": "2026-09-25",
-
   "verdikte": [
-    { "id": "BEHALTEN",  "farbe": "#2e9b50", "text": "Aufheben" },
-    { "id": "WÜRFELN",   "farbe": "#8a4fd6", "text": "In den Horadrimwürfel (Horadric Cube)" },
-    { "id": "ZERLEGEN",  "farbe": "#d0702a", "text": "Beim Schmied zerlegen (Salvage)" },
-    { "id": "VERWERTEN", "farbe": "#2f7fcf", "text": "Als Material verwenden" },
-    { "id": "VERKAUFEN", "farbe": "#8a8a3a", "text": "Beim Händler verkaufen (Sell)" },
-    { "id": "ANLEGEN",   "farbe": "#c9a227", "text": "Sofort ausrüsten (Equip)" }
+    {
+      "id": "BEHALTEN",
+      "farbe": "#2e9b50",
+      "text": "Aufheben"
+    },
+    {
+      "id": "WÜRFELN",
+      "farbe": "#8a4fd6",
+      "text": "In den Horadrimwürfel (Horadric Cube)"
+    },
+    {
+      "id": "ZERLEGEN",
+      "farbe": "#d0702a",
+      "text": "Beim Schmied zerlegen (Salvage)"
+    },
+    {
+      "id": "VERWERTEN",
+      "farbe": "#2f7fcf",
+      "text": "Als Material verwenden"
+    },
+    {
+      "id": "VERKAUFEN",
+      "farbe": "#8a8a3a",
+      "text": "Beim Händler verkaufen (Sell)"
+    },
+    {
+      "id": "ANLEGEN",
+      "farbe": "#c9a227",
+      "text": "Sofort ausrüsten (Equip)"
+    }
   ],
-
   "seltenheitSynonyme": [
-    { "id": "gewöhnlich",  "name_de": "Gewöhnlich",  "name_en": "Common",    "synonyme": ["weiß", "white", "common", "gewöhnlich"] },
-    { "id": "magisch",     "name_de": "Magisch",     "name_en": "Magic",     "synonyme": ["blau", "blue", "magic", "magisch"] },
-    { "id": "selten",      "name_de": "Selten",      "name_en": "Rare",      "synonyme": ["gelb", "yellow", "rare", "selten"] },
-    { "id": "legendär",    "name_de": "Legendär",    "name_en": "Legendary", "synonyme": ["orange", "legendary", "legendär"] },
-    { "id": "einzigartig", "name_de": "Einzigartig", "name_en": "Unique",    "synonyme": ["braun", "brown", "gold", "unique", "einzigartig"] },
-    { "id": "mythisch",    "name_de": "Mythisch",    "name_en": "Mythic",    "synonyme": ["rot", "red", "mythic", "mythisch"] },
-    { "id": "vermacht",    "name_de": "Vermacht",    "name_en": "Ancestral", "synonyme": ["900", "ancestral", "vermacht"] }
+    {
+      "id": "gewöhnlich",
+      "name_de": "Gewöhnlich",
+      "name_en": "Common",
+      "synonyme": [
+        "weiß",
+        "white",
+        "common",
+        "gewöhnlich"
+      ]
+    },
+    {
+      "id": "magisch",
+      "name_de": "Magisch",
+      "name_en": "Magic",
+      "synonyme": [
+        "blau",
+        "blue",
+        "magic",
+        "magisch"
+      ]
+    },
+    {
+      "id": "selten",
+      "name_de": "Selten",
+      "name_en": "Rare",
+      "synonyme": [
+        "gelb",
+        "yellow",
+        "rare",
+        "selten"
+      ]
+    },
+    {
+      "id": "legendär",
+      "name_de": "Legendär",
+      "name_en": "Legendary",
+      "synonyme": [
+        "orange",
+        "legendary",
+        "legendär"
+      ]
+    },
+    {
+      "id": "einzigartig",
+      "name_de": "Einzigartig",
+      "name_en": "Unique",
+      "synonyme": [
+        "braun",
+        "brown",
+        "gold",
+        "unique",
+        "einzigartig"
+      ]
+    },
+    {
+      "id": "mythisch",
+      "name_de": "Mythisch",
+      "name_en": "Mythic",
+      "synonyme": [
+        "rot",
+        "red",
+        "mythic",
+        "mythisch"
+      ]
+    },
+    {
+      "id": "vermacht",
+      "name_de": "Vermacht",
+      "name_en": "Ancestral",
+      "synonyme": [
+        "900",
+        "ancestral",
+        "vermacht"
+      ]
+    }
   ],
-
   "eintraege": [],
-
   "regeln": [
     {
       "id": "rune-ueberschuss",
-      "trifft": { "typ": "rune", "seltenheit": ["magisch", "selten"] },
-      "suchbegriffe": ["gelbe rune", "yellow rune", "blaue runen"],
+      "trifft": {
+        "typ": "rune",
+        "seltenheit": [
+          "magisch",
+          "selten"
+        ]
+      },
+      "suchbegriffe": [
+        "gelbe rune",
+        "yellow rune",
+        "blaue runen"
+      ],
       "verdikt": "WÜRFELN",
       "begruendung": "",
-      "ausnahmen": ["Nagu", "Que", "Tir", "Igni"],
+      "ausnahmen": [
+        "Nagu",
+        "Que",
+        "Tir",
+        "Igni"
+      ],
       "ausnahmeText": "Diese Runen braucht der Build direkt.",
       "notiz": "",
       "stand": "2026-09-25"
     }
   ],
-
-  "rezepte": [],
-
+  "rezepte": [
+    {
+      "id": "reroll-affixwerte",
+      "name_de": "Affixwerte neu würfeln",
+      "name_en": "",
+      "input": "",
+      "kosten": "",
+      "ergebnis": "Neue Werte für die vorhandenen Affixe. Große Affixe, Verzauberungen, Härtungen und Transfigurationen bleiben erhalten.",
+      "notiz": "",
+      "stand": "2026-09-25"
+    }
+  ],
   "farmziele": [],
-
   "notizen": [
     {
       "frage": "Was mache ich mit überschüssigen Set-Zaubern?",
       "antwort": "",
-      "typen": ["zauber", "siegel"],
-      "schlagworte": ["set", "charm", "zauber", "talisman"],
+      "typen": [
+        "zauber",
+        "siegel"
+      ],
+      "schlagworte": [
+        "set",
+        "charm",
+        "zauber",
+        "talisman"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "id": "item-reihenfolge",
+      "frage": "In welcher Reihenfolge bearbeite ich ein Item?",
+      "antwort": "Affixe im Würfel, dann Sockel, dann Aspekt, dann Härten, dann Vollenden. Transfigurieren immer zuletzt.",
+      "reihenfolge": [
+        "affixe",
+        "sockel",
+        "aspekt",
+        "haerten",
+        "vollenden",
+        "transfigurieren"
+      ],
+      "typen": [],
+      "schlagworte": [
+        "reihenfolge",
+        "verzaubern",
+        "härten",
+        "vollenden",
+        "transfigurieren"
+      ],
       "stand": "2026-09-25"
     }
   ],
-
-  "quellen": []
+  "quellen": [],
+  "uniqueQuellen": []
 }
