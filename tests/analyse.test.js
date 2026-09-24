@@ -576,3 +576,11 @@ test('Item prüfen: legendär, nicht im Build → Regel „nicht getragen“; ve
   assert.equal(L.bewerteItem({ item: it(), profil: profilFehlt(), wissen: w, katalog: katalogAffixe }).verdikt, 'ZERLEGEN');
   assert.equal(L.bewerteItem({ item: it({ vermacht: true }), profil: profilFehlt(), wissen: w, katalog: katalogAffixe }).verdikt, 'BEHALTEN');
 });
+
+test('index.html: alle Skripte und das Stylesheet tragen dieselbe Versionsnummer', () => {
+  const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'index.html'), 'utf8');
+  const meta = html.match(/name="app-version" content="([^"]+)"/)[1];
+  const versionen = [...html.matchAll(/(?:src|href)="[^"]+\?v=([^"]+)"/g)].map(m => m[1]);
+  assert.ok(versionen.length >= 5);
+  assert.ok(versionen.every(v => v === meta), `Versionen: ${versionen.join(', ')} / meta ${meta}`);
+});
