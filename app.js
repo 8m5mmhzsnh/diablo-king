@@ -12,28 +12,17 @@ const FILES = {
   wissen: 'data/wissen.json',
   profil: 'data/profil.json',
   profilLeer: 'data/profil-leer.json',
+  katalog: 'data/katalog.json',
 };
 const LS = {
   wissen: 'd4k2.wissen',            // Arbeitskopie wissen.json
   wissenBasis: 'd4k2.wissenBasis',  // Fingerabdruck der Datei, auf der die Arbeitskopie beruht
   wissenLokal: 'd4k2.wissenLokal',  // true, wenn in der App am Wissen etwas geändert wurde
   profil: 'd4k2.profil',
+  katalog: 'd4k2.katalog',
   altBuilds: 'd4k.builds', altAktiv: 'd4k.aktiv', altZiel: 'd4k.ziel',  // Schema 1
 };
 
-const SLOTS = [
-  { key: 'kopf', de: 'Kopf', en: 'Helm' },
-  { key: 'brust', de: 'Brust', en: 'Chest' },
-  { key: 'haende', de: 'Hände', en: 'Gloves' },
-  { key: 'beine', de: 'Beine', en: 'Pants' },
-  { key: 'fuesse', de: 'Füße', en: 'Boots' },
-  { key: 'amulett', de: 'Amulett', en: 'Amulet' },
-  { key: 'ring1', de: 'Ring 1', en: 'Ring 1' },
-  { key: 'ring2', de: 'Ring 2', en: 'Ring 2' },
-  { key: 'waffe', de: 'Waffe', en: 'Weapon' },
-  { key: 'fokus', de: 'Fokus', en: 'Offhand' },
-];
-const SLOT_BY_KEY = Object.fromEntries(SLOTS.map(s => [s.key, s]));
 
 
 const TRIFFT_LABEL = {
@@ -51,69 +40,6 @@ const $ = sel => document.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-/** Normalisiert für Vergleiche: klein, ohne Akzente, nur a-z0-9 + Leerzeichen. */
-function norm(s) {
-  return String(s ?? '')
-    .toLowerCase()
-    .replace(/ß/g, 'ss')
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-const tokens = s => norm(s).split(' ').filter(Boolean);
-
-/** Enthält `hay` die Wortfolge `needle` (beides normalisiert)? */
-function hasWords(hay, needle) {
-  if (!hay || !needle) return false;
-  return (' ' + hay + ' ').includes(' ' + needle + ' ');
-}
-
-/* Wortvergleich, der Endungen verzeiht: rune/runen, gelb/gelbe/gelben, selten/seltener, ring/rings. */
-const SUFFIXE = ['e', 'n', 'en', 'er', 'es', 'em', 'ern', 's', 'r'];
-function stems(w) {
-  const out = new Set([w]);
-  for (const s of SUFFIXE) if (w.endsWith(s) && w.length - s.length >= 3) out.add(w.slice(0, -s.length));
-  return out;
-}
-function wordEq(a, b) {
-  if (a === b) return true;
-  if (a.length < 3 || b.length < 3) return false;
-  const sb = stems(b);
-  for (const x of stems(a)) if (sb.has(x)) return true;
-  return false;
-}
-/** Gleiche Wortfolge mit toleranten Endungen: "gelbe runen" ≈ "gelbe rune". */
-function phraseEq(a, b) {
-  const ta = a.split(' '), tb = b.split(' ');
-  return ta.length === tb.length && ta.every((t, i) => wordEq(t, tb[i]));
-}
-/** Kommt die Wortfolge `needle` (tolerant) in `hay` vor? */
-function phraseIn(hay, needle) {
-  const th = hay.split(' '), tn = needle.split(' ');
-  for (let i = 0; i + tn.length <= th.length; i++) {
-    if (tn.every((t, j) => wordEq(th[i + j], t))) return true;
-  }
-  return false;
-}
-
-/** "Verwegenheit (Temerity)" – nur einmal, wenn gleich oder eins fehlt. */
-function bi(de, en) {
-  de = String(de || '').trim(); en = String(en || '').trim();
-  if (de && en && norm(de) !== norm(en)) return `${de} (${en})`;
-  return de || en;
-}
-function itemText(x) {
-  if (x == null) return '';
-  if (typeof x !== 'object') return String(x);
-  const n = bi(x.name_de || x.name, x.name_en);
-  return x.menge != null && x.menge !== '' ? `${x.menge}× ${n}` : n;
-}
-function listText(x) {
-  if (x == null || x === '') return '';
-  if (Array.isArray(x)) return x.map(itemText).filter(Boolean).join(', ');
-  return itemText(x);
-}
-const asArray = x => (x == null || x === '' ? [] : Array.isArray(x) ? x : [x]);
 
 function lsGet(key, fallback) {
   try {
@@ -173,6 +99,9 @@ const state = {
   importOpen: false,
   eintragEditor: null,    // { index, draft }
   dateienOpen: false,
+  katalog: { uniques: [] },
+  katalogQuelle: '',
+  invEditor: null,        // Item-Entwurf (OCR oder manuell), wird erst mit „Übernehmen“ Inventar
 };
 
 function warnTage() {
@@ -237,6 +166,9 @@ function normalizeBuild(b) {
 function normalizeProfil(p) {
   p = Object.assign({}, p || {});
   if (!p.charakter || typeof p.charakter !== 'object') p.charakter = {};
+  for (const k of ['qualstufe', 'paragon']) if (!(k in p.charakter)) p.charakter[k] = '';
+  p.inventar = normalizeInventar(p.inventar);
+  if (!p.bestand || typeof p.bestand !== 'object' || Array.isArray(p.bestand)) p.bestand = {};
   p.einstellungen = Object.assign({ warnTageBuildAlter: 14 }, p.einstellungen || {});
   for (const k of ['builds', 'sammelliste', 'offeneAufgaben', 'abweichungen']) if (!Array.isArray(p[k])) p[k] = [];
   p.builds = p.builds.map(normalizeBuild);
@@ -312,6 +244,20 @@ async function loadWissen() {
     });
   }
   state.wissen = normalizeWissen(state.wissen);
+}
+
+/** katalog.json ist optional: Hinweise wie num_inherents für Uniques. */
+async function loadKatalog() {
+  const r = await fetchJson(FILES.katalog);
+  let k = null;
+  if (r.ok) { k = r.data; lsSet(LS.katalog, k); state.katalogQuelle = FILES.katalog; }
+  else {
+    k = lsGet(LS.katalog, null);
+    state.katalogQuelle = k ? 'Arbeitskopie im Browser' : `nicht geladen (${r.error})`;
+  }
+  k = Object.assign({}, k || {});
+  if (!Array.isArray(k.uniques)) k.uniques = [];
+  state.katalog = k;
 }
 
 async function loadProfil() {
@@ -392,25 +338,10 @@ function verdiktHtml(id, big) {
 }
 const istVerdikt = (a, b) => norm(a) === norm(b);
 
-/* ---------- Seltenheit ---------- */
+/* ---------- Seltenheit (Logik in lib.js) ---------- */
 
-function seltenheitAus(token) {
-  for (const s of state.wissen.seltenheitSynonyme) {
-    for (const syn of [s.id, ...s.synonyme]) {
-      const n = norm(syn);
-      if (n && !n.includes(' ') && wordEq(token, n)) return s.id;
-    }
-  }
-  return '';
-}
-function seltenheitKanon(wert) {
-  const n = norm(wert);
-  if (!n) return '';
-  for (const s of state.wissen.seltenheitSynonyme) {
-    if ([s.id, s.name_de, s.name_en, ...s.synonyme].some(x => norm(x) === n)) return s.id;
-  }
-  return seltenheitAus(n) || wert;
-}
+const selKanon = w => seltenheitKanon(state.wissen, w);
+
 function seltenheitAnzeige(id) {
   const s = state.wissen.seltenheitSynonyme.find(x => x.id === id);
   return s ? bi(s.name_de, s.name_en) : id;
@@ -430,7 +361,7 @@ function analysiere(q) {
       }
     }
   }
-  rest = rest.filter(t => { const id = seltenheitAus(t); if (id) { selt.add(id); return false; } return true; });
+  rest = rest.filter(t => { const id = seltenheitAus(state.wissen, t); if (id) { selt.add(id); return false; } return true; });
   const typWerte = alleTypWerte();
   const typErkannt = rest.some(t => typWerte.some(v => wordEq(t, v)));
   return { q, selt, rest, typErkannt };
@@ -449,19 +380,6 @@ function alleTypWerte() {
 
 /* ---------- Quellen ---------- */
 
-function quelleText(q) {
-  if (!q) return '';
-  if (typeof q === 'object') return bi(q.name_de || q.name, q.name_en);
-  const n = norm(q);
-  const src = state.wissen.quellen.find(x => norm(x.id) === n || norm(x.name_de) === n || norm(x.name_en) === n);
-  if (!src) return String(q);
-  const t = bi(src.name_de || src.name, src.name_en) || src.id;
-  return src.typ ? `${t} [${src.typ}]` : t;
-}
-function farmQuelle(f) {
-  const q = f.quelle ? quelleText(f.quelle) : bi(f.quelle_de, f.quelle_en);
-  return f.typ && q && !q.includes('[') ? `${q} [${f.typ}]` : q;
-}
 
 /* ================================================================
    Suchindex
@@ -471,9 +389,6 @@ let INDEX = [];
 
 function entryKeys(e) {
   return [e.name_de, e.name_en, e.name, ...asArray(e.aliase)].map(norm).filter(Boolean);
-}
-function splitParts(text) {
-  return String(text || '').split(/[,+;\/&\n]| und | and /i).map(x => x.trim()).filter(Boolean);
 }
 
 function buildIndex() {
@@ -532,7 +447,7 @@ function trifftScore(r, qa) {
   if (!typVals.length) return 0;
   const typTokens = typVals.flatMap(tokens);
   if (!qa.rest.some(tok => typTokens.some(v => wordEq(tok, v)))) return 0;
-  const sel = asArray(t.seltenheit).map(seltenheitKanon);
+  const sel = asArray(t.seltenheit).map(selKanon);
   if (qa.selt.size) {
     if (!sel.length) return 65;
     return [...qa.selt].every(s => sel.includes(s)) ? 85 : 0;
@@ -562,7 +477,7 @@ function regelnFuerSuche(qa) {
   if (!hits.length && (qa.selt.size || qa.typErkannt)) {
     for (const r of state.wissen.regeln) {
       if (!istFallback(r)) continue;
-      const sel = asArray(r.trifft?.seltenheit).map(seltenheitKanon);
+      const sel = asArray(r.trifft?.seltenheit).map(selKanon);
       if (sel.length && !(qa.selt.size && [...qa.selt].every(s => sel.includes(s)))) continue;
       hits.push({ r, s: 30, fallback: true });
     }
@@ -579,12 +494,12 @@ function istAusnahme(r, keys) {
 function regelFuerEintrag(e, imBuild) {
   const keys = entryKeys(e);
   const typT = [...asArray(e.typ), ...asArray(e.itemTyp)].flatMap(tokens);
-  const selt = seltenheitKanon(e.seltenheit);
+  const selt = selKanon(e.seltenheit);
   const passt = r => {
     const t = r.trifft || {};
     if (t.nichtImBuild === true && imBuild) return false;
     if (istAusnahme(r, keys)) return false;
-    const sel = asArray(t.seltenheit).map(seltenheitKanon);
+    const sel = asArray(t.seltenheit).map(selKanon);
     if (sel.length && !sel.includes(selt)) return false;
     return true;
   };
@@ -666,11 +581,11 @@ function endVerdikt(basis, abw, bz) {
 
 function quellenFuer(keys, eigene) {
   const out = [];
-  if (eigene) asArray(eigene).forEach(q => { const t = quelleText(q); if (t) out.push(t); });
+  if (eigene) asArray(eigene).forEach(q => { const t = quelleText(state.wissen, q); if (t) out.push(t); });
   for (const f of state.wissen.farmziele) {
     const hit = asArray(f.belohnungen).some(x => { const n = norm(itemText(x)); return keys.some(k => hasWords(n, k)); });
     if (!hit) continue;
-    const t = farmQuelle(f);
+    const t = farmQuelle(state.wissen, f);
     if (!t) continue;
     const plain = norm(t.replace(/\s*\[.*\]$/, ''));
     const dup = out.findIndex(o => { const po = norm(o.replace(/\s*\[.*\]$/, '')); return po === plain || hasWords(plain, po); });
@@ -714,6 +629,7 @@ function setTab(tab) {
   state.importOpen = false;
   state.eintragEditor = null;
   state.dateienOpen = false;
+  schliesseInvEditor();
   render();
   window.scrollTo(0, 0);
 }
@@ -747,6 +663,8 @@ function render() {
     case 'farmziele': main.innerHTML = viewFarmziele(); break;
     case 'wissen': main.innerHTML = state.eintragEditor ? viewEintragEditor() : viewWissen(); break;
     case 'abweichungen': main.innerHTML = viewAbweichungen(); break;
+    case 'inventar': main.innerHTML = state.invEditor ? viewInvEditor() : viewInventar(); break;
+    case 'naechster': main.innerHTML = viewNaechster(); break;
     default:
       if (state.eintragEditor) main.innerHTML = viewEintragEditor();
       else renderSuche(main);
@@ -810,10 +728,10 @@ function notizenHtml(typen, qa, gezeigt) {
   const n = notizenFuer(typen, qa).filter(x => !gezeigt.has(x));
   n.forEach(x => gezeigt.add(x));
   if (!n.length) return '';
-  return `<div class="notes">${n.map(notizKarte).join('')}</div>`;
+  return `<div class="notes">${n.map(x => notizKarte(x)).join('')}</div>`;
 }
-function notizKarte(n) {
-  return `<details class="note"><summary>${esc(n.frage || '(ohne Frage)')} ${staleIcon(n.stand)}</summary>
+function notizKarte(n, i) {
+  return `<details class="note"${typeof i === 'number' ? ` id="notiz-${i}"` : ''}><summary>${esc(n.frage || '(ohne Frage)')} ${staleIcon(n.stand)}</summary>
     <div class="note-body">${n.antwort ? esc(n.antwort).replace(/\n/g, '<br>') : '<span class="muted">Noch keine Antwort eingetragen.</span>'}
     ${asArray(n.typen).length || asArray(n.schlagworte).length ? `<div class="small muted" style="margin-top:6px">
       ${asArray(n.typen).map(t => `<span class="tag">${esc(t)}</span>`).join('')}
@@ -859,7 +777,7 @@ function cardName(e, qa, gezeigt) {
   const abw = abweichungFuer(e.keys);
   const ev = endVerdikt(basis, abw, bz);
   const typen = e.kind === 'eintrag' ? [src.typ, src.itemTyp].filter(Boolean) : [];
-  const meta = [src.typ, src.itemTyp, src.seltenheit ? seltenheitAnzeige(seltenheitKanon(src.seltenheit)) : ''].filter(Boolean);
+  const meta = [src.typ, src.itemTyp, src.seltenheit ? seltenheitAnzeige(selKanon(src.seltenheit)) : ''].filter(Boolean);
 
   const rows = [];
   rows.push(`<div><span class="k">Build</span>${badgeHtml(bz)} ${esc(bezugDetail(bz))}</div>`);
@@ -888,7 +806,7 @@ function trifftHtml(t) {
   const parts = Object.entries(t || {}).map(([k, v]) => {
     let val;
     if (typeof v === 'boolean') val = v ? 'ja' : 'nein';
-    else if (k === 'seltenheit') val = asArray(v).map(x => seltenheitAnzeige(seltenheitKanon(x))).join(', ');
+    else if (k === 'seltenheit') val = asArray(v).map(x => seltenheitAnzeige(selKanon(x))).join(', ');
     else val = asArray(v).join(', ');
     return `${TRIFFT_LABEL[k] || k}: ${val}`;
   });
@@ -1319,7 +1237,7 @@ function viewFarmziele() {
   if (!f.length) html += '<div class="msg info">Keine Farm-Ziele in wissen.json (Sektion „farmziele“).</div>';
   else html += `<h2>Farm-Ziele</h2>` + f.map(x => `
     <div class="card">
-      <div class="res-head"><span class="res-name">${esc(farmQuelle(x) || '–')}</span> ${staleIcon(x.stand)}</div>
+      <div class="res-head"><span class="res-name">${esc(farmQuelle(state.wissen, x) || '–')}</span> ${staleIcon(x.stand)}</div>
       <div class="res-rows">
         <div><span class="k">Belohnung</span>${esc(listText(x.belohnungen) || '–')}</div>
         ${x.kosten ? `<div><span class="k">Kosten</span>${esc(listText(x.kosten))}</div>` : ''}
@@ -1379,7 +1297,7 @@ function startEintragEditor(index, draft) {
 function viewEintragEditor() {
   const { index, draft: e } = state.eintragEditor;
   const verd = state.wissen.verdikte.map(v => `<option value="${esc(v.id)}" ${istVerdikt(v.id, e.verdikt) ? 'selected' : ''}>${esc(v.id)}</option>`).join('');
-  const selt = state.wissen.seltenheitSynonyme.map(s => `<option value="${esc(s.id)}" ${seltenheitKanon(e.seltenheit) === s.id ? 'selected' : ''}>${esc(bi(s.name_de, s.name_en))}</option>`).join('');
+  const selt = state.wissen.seltenheitSynonyme.map(s => `<option value="${esc(s.id)}" ${selKanon(e.seltenheit) === s.id ? 'selected' : ''}>${esc(bi(s.name_de, s.name_en))}</option>`).join('');
   return `
     <h2>${index < 0 ? 'Neuer Eintrag (Rohling)' : 'Eintrag bearbeiten'}</h2>
     <div class="msg info">Wird in der Arbeitskopie von wissen.json gespeichert. Zum Behalten unter „Dateien“ exportieren.</div>
@@ -1478,6 +1396,10 @@ function viewDateien() {
       <label class="btn">wissen.json importieren (ersetzt komplett)<input type="file" id="file-wissen" accept=".json,application/json" hidden></label>
       <button class="btn danger" data-act="wissen-neu">Aus Datei im Repo neu laden</button>
     </div>
+
+    <h2>katalog.json <span class="muted small">Hinweise zu Uniques</span></h2>
+    <div class="kv small"><span class="k">Quelle:</span> ${esc(state.katalogQuelle)} · ${state.katalog.uniques.length} Uniques
+      <br><span class="muted">Wird bei der Screenshot-Erkennung genutzt (num_inherents → implizite Affixe vormarkieren).</span></div>
 
     <h2>profil.json <span class="muted small">persönlich</span></h2>
     <div class="kv small">
@@ -1702,7 +1624,11 @@ document.addEventListener('submit', e => {
   }
   if (f.id === 'profil-form') {
     const fd = new FormData(f);
-    for (const [k, v] of fd.entries()) if (k.startsWith('c.')) p.charakter[k.slice(2)] = String(v).trim();
+    for (const [k, v] of fd.entries()) {
+      if (!k.startsWith('c.')) continue;
+      const t = String(v).trim();
+      p.charakter[k.slice(2)] = /^\d+$/.test(t) ? Number(t) : t;   // qualstufe, paragon als Zahl
+    }
     const n = parseInt(fd.get('warnTage'), 10);
     if (n > 0) p.einstellungen.warnTageBuildAlter = n;
     saveProfil(); render(); return;
@@ -1731,6 +1657,7 @@ document.addEventListener('submit', e => {
   try {
     await loadWissen();
     await loadProfil();
+    await loadKatalog();
     pruefeSchema();
     buildIndex();
   } catch (err) {

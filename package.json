@@ -1,0 +1,8 @@
+{
+  "name": "diablo-king",
+  "private": true,
+  "description": "Diablo-4-Spickzettel – statische Web-App ohne Abhängigkeiten",
+  "scripts": {
+    "test": "node --test"
+  }
+}

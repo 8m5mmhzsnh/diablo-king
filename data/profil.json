@@ -5,11 +5,67 @@
     "name": "",
     "klasse": "",
     "stufe": "",
-    "notiz": ""
+    "notiz": "",
+    "qualstufe": 6,
+    "paragon": 139
   },
   "einstellungen": {
     "warnTageBuildAlter": 14
   },
+  "inventar": {
+    "kopf": null,
+    "brust": null,
+    "haende": null,
+    "beine": null,
+    "fuesse": null,
+    "amulett": null,
+    "ring1": null,
+    "ring2": null,
+    "waffe": {
+      "name": "Elegy",
+      "slug": "elegy",
+      "seltenheit": "einzigartig",
+      "itemTyp": "Sword",
+      "gegenstandsmacht": 850,
+      "vermacht": false,
+      "aspekt": "",
+      "affixe": [
+        {
+          "text": "Willpower",
+          "wert": "",
+          "gross": false,
+          "implizit": true,
+          "verzaubert": false
+        },
+        {
+          "text": "Physical Damage Multiplier",
+          "wert": "7%",
+          "gross": false,
+          "implizit": false,
+          "verzaubert": false
+        }
+      ],
+      "sockel": [
+        {
+          "gefuellt": true,
+          "inhalt": "Ruby"
+        }
+      ],
+      "haertungen": {
+        "genutzt": 1,
+        "max": 1,
+        "affix": "Attack Speed"
+      },
+      "vollendung": {
+        "stufe": 0,
+        "max": 25
+      },
+      "stand": "2026-09-25",
+      "quelle": "ocr"
+    },
+    "fokus": null
+  },
+  "bestand": {},
   "builds": [
     {
       "id": "aktuell",

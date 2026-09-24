@@ -2,7 +2,7 @@
 
 Persönlicher Diablo-4-Spickzettel: Namen oder Kategorie eintippen, zum Beispiel „Nagu“, „gelbe Rune“ oder „rare ring“. Die App zeigt sofort ein Verdikt, etwa **BEHALTEN**, **WÜRFELN**, **ZERLEGEN**, **VERWERTEN**, **VERKAUFEN** oder **ANLEGEN**.
 
-Reines HTML/CSS/JS, keine Abhängigkeiten, kein Build-Schritt.
+Reines HTML/CSS/JS, kein Build-Schritt. Einzige externe Abhängigkeit ist die Texterkennung, und die wird erst beim ersten Screenshot geladen.
 
 ## Starten
 
@@ -113,10 +113,79 @@ Ist der Stand älter als `profil.einstellungen.warnTageBuildAlter`, erscheint �
 }
 ```
 
+## Inventar und Item-Analyse
+
+**Reiter „Inventar“:** zehn Slot-Karten (Kopf, Brust, Handschuhe, Hose, Stiefel, Amulett, Ring 1, Ring 2, Waffe, Fokus).
+
+**Item erfassen:**
+- Screenshot eines Tooltips einfügen: auf die Karte tippen und Bild wählen, Strg+V drücken oder das Bild hineinziehen. Alternativ „Manuell erfassen“.
+- Die Texterkennung ([Tesseract.js](https://github.com/naptha/tesseract.js)) läuft komplett im Browser. Beim ersten Screenshot lädt die App sie von cdn.jsdelivr.net, dafür braucht es einmal Internet.
+- Die App schlägt einen Slot vor (aus dem Item-Typ oder `katalog.json`), du bestätigst ihn.
+- Alle erkannten Felder erscheinen zur Korrektur. Affixzeilen haben eine Konfidenz und lassen sich einzeln bearbeiten, hinzufügen und löschen.
+- **Erst „Übernehmen“ schreibt ins Inventar.** Die Analyse sieht nie den rohen Erkennungstext.
+- Bei Uniques werden die ersten `num_inherents` Zeilen (aus `data/katalog.json`) als implizit vormarkiert. Das ist ein Hinweis, du kannst es umschalten.
+
+**Slot-Analyse:** Pro Slot vergleicht die App das Item mit dem aktiven und dem Ziel-Build. Heraus kommen konkrete Handlungen mit Begründung und Priorität:
+- **Ersetzen:** mit Quelle aus `wissen.uniqueQuellen` bzw. `farmziele`
+- **Aspekt überprägen**
+- **Sockeln:** einsetzen, ersetzen oder Sockel hinzufügen (kostet 1 Zerstreutes Prisma)
+- **Verzaubern:** schlechteste Zeile auf den obersten fehlenden Zielaffix umrollen, mit Pflicht-Warnung „nur EIN Affix“
+- **Rezept `reroll-affixwerte`:** wenn du Werte als schwach markiert hast
+- **Härten:** nur bei Keepern, Warnung ohne Schriftrolle der Wiederherstellung
+- **Vollenden:** nur Keeper und ab Qual 4
+
+Sind mehrere Aktionen offen, zeigt die App die Bearbeitungsreihenfolge. Sie kommt aus der Notiz `item-reihenfolge` (Feld `reihenfolge`) und verlinkt auf diese Notiz.
+
+**Reiter „Nächster Schritt“:** Alle Aktionen nach Priorität, gruppiert in „kostet nur Gold“, „braucht knappe Materialien“ und „beschaffen“.
+Material-Engpässe kommen aus `wissen.engpaesse`. Fehlt das Feld, leitet die App sie aus Einträgen mit `typ: "material"` ab. Darunter stehen die Wechselkriterien des Ziel-Builds und die offenen Aufgaben.
+
+**Grenzen, bewusst:**
+- Keine Werte-Vergleiche gegen Roll-Bereiche. Es gibt keine Min-/Max-Datenbank.
+- Keine Schadensberechnung, kein DPS-Vergleich.
+- Die Empfehlungen sind Regelanwendung, kein Simulator.
+
+**Neue Felder in `profil.json`:**
+
+```jsonc
+"charakter": { …, "qualstufe": 6, "paragon": 139 },
+"inventar": {
+  "waffe": {
+    "name": "", "slug": "", "seltenheit": "", "itemTyp": "", "gegenstandsmacht": 0,
+    "vermacht": false, "aspekt": "",
+    "affixe": [{ "text": "", "wert": "", "gross": false, "implizit": false, "verzaubert": false, "schwach": false }],
+    "sockel": [{ "gefuellt": false, "inhalt": "" }],
+    "haertungen": { "genutzt": 0, "max": 0, "affix": "" },
+    "vollendung": { "stufe": 0, "max": 25 },
+    "stand": "YYYY-MM-DD", "quelle": "ocr"            // oder "manuell"
+  }
+  // … kopf, brust, haende, beine, fuesse, amulett, ring1, ring2, fokus (null = leer)
+},
+"bestand": { "Schriftrolle der Wiederherstellung": 0 }   // leer/fehlend = unbekannt
+```
+
+`aspekt` (der geprägte Aspekt) und `schwach` (Wert schwach, ohne Roll-Datenbank von dir gesetzt) sind Ergänzungen.
+Die Analyse braucht sie für „Aspekt überprägen“ und das Rezept `reroll-affixwerte`.
+
+**Neue Felder in `wissen.json`:**
+- `uniqueQuellen`: `[{ "slug", "name_de", "name_en", "quelle" | "quellen": [] }]`
+- optional `engpaesse`: `["Obduzit", …]`
+- das Rezept `reroll-affixwerte`
+- die Notiz `item-reihenfolge`
+
+**`data/katalog.json`:** `{ "uniques": [{ "slug", "name_de", "name_en", "itemTyp", "slot", "num_inherents" }] }`. Wird ausgeliefert, aber leer.
+
+## Tests
+
+```
+npm test        # = node --test, prüft Slot-Analyse und Tooltip-Parser (lib.js)
+```
+
 ## Reiter
 
 - **Suche** (Startseite): großes Suchfeld, darunter die Sammelliste
 - **Builds**: anlegen, bearbeiten, aktiv/Ziel setzen, Guide-Text importieren, Wechselkriterien
+- **Inventar**: Items per Screenshot oder von Hand erfassen, Analyse pro Slot, Material-Bestand
+- **Nächster Schritt**: alle Aktionen nach Priorität, Engpässe, Wechselkriterien, Aufgaben
 - **Checkliste**: Slots des aktiven Builds mit Quelle und Häkchen, Wechselkriterien des Ziel-Builds, offene Aufgaben
 - **Rezepte**: Horadrimwürfel
 - **Farmziele**: Farmziele und Quellen
