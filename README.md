@@ -149,7 +149,21 @@ Ist der Stand älter als `profil.einstellungen.warnTageBuildAlter`, erscheint �
   - **Katalog-Abgleich:** Affixnamen werden mit `katalog.json` abgeglichen. Typische OCR-Fehler wie „Thoms“ werden zu „Thorns“ korrigiert und markiert.
   - **Aspekt:** Bei legendären Items leitet die App den Aspekt aus dem Namen ab („Sadistic Doom Casque“ → Sadistischer Aspekt).
   - **Große Affixe:** Ein Stern vor einer Affixzeile merkt sie als „groß“ vor.
-- **Grenzen:** Die Zierschrift der Item-Namen wird oft falsch gelesen („Doom“ → „Dos“). Bei Uniques korrigiert der Katalog-Abgleich das; bei legendären Items ist der Name ohnehin zweitrangig, entscheidend ist der Aspekt.
+  - **Verzaubert:** Das blaue Kreissymbol vor einer Zeile wird über die Farbe erkannt und merkt die Zeile als „verzaubert“ vor.
+  - **Uniques und Runenwörter:** Der Name wird im verrauschten Titel gesucht („iy STEALTH FE“ → Stealth). Runenwort- und Unique-Absätze zählen nicht als Affixe. Runen im Sockel („CirOhm (300/600)“) werden zu Sockelinhalten.
+  - **Spiel-UI:** Zeilen wie „Scroll Down“, „Unequip“, „Mark as Favorite“ oder „Seasonal Item“ werden ignoriert. Ist der Tooltip abgeschnitten, weist die App darauf hin.
+- **Grenzen:**
+  - Die Zierschrift der Item-Namen wird oft falsch gelesen („Doom“ → „Dos“). Bei Uniques korrigiert der Abgleich das; bei legendären Items zählt ohnehin der Aspekt.
+  - Wird der Tooltip von „Scroll Down“ verdeckt, fehlen Härtungen und Vollendung. Dann im Spiel scrollen und neu aufnehmen.
+
+### Build-Affixe auf Deutsch, Tooltips auf Englisch
+
+Die Builds nennen Affixe auf Deutsch („Willenskraft“), die Tooltips auf Englisch („Willpower“). Den Vergleich übernimmt **`data/uebersetzungen.json`** (Deutsch → Katalogname, z. B. `"Willenskraft": "Willpower"`).
+- **„Primärattribut“** passt auf Strength, Dexterity, Intelligence oder Willpower. Wer es enger will, setzt `charakter.primaerattribut`.
+- **Klammerzusätze** wie „(Worldly Endurance)“ werden beim Vergleich ignoriert.
+- **Schutz vor Fehlalarmen:** Hat ein Build-Affix keine Übersetzung und ist selbst kein Katalogname, meldet die Analyse ihn als **„nicht vergleichbar“**. Er gilt dann weder als vorhanden noch als fehlend, und die App schlägt für dieses Item **keine** Zeile zum Umrollen vor.
+- **Einen fehlenden Begriff ergänzen:** eine Zeile in `data/uebersetzungen.json` hinzufügen, rechts genau der englische Name aus `katalog.json`.
+- **Optional** kann `wissen.json` eine Sektion `affixUebersetzungen` mit demselben Format haben; sie ergänzt die Datei.
 - Die App schlägt einen Slot vor (aus dem Eintrag in `wissen.json`, sonst aus dem Item-Typ), du bestätigst ihn.
 - Alle erkannten Felder erscheinen zur Korrektur. Affixzeilen haben eine Konfidenz und lassen sich einzeln bearbeiten, hinzufügen und löschen.
 - **Erst „Übernehmen“ schreibt ins Inventar.** Die Analyse sieht nie den rohen Erkennungstext.
@@ -221,6 +235,9 @@ Die Vorschlagslisten nutzen `uniques`, `aspekte`, `itemTypen` und `affixe`.
 ```
 npm test        # = node --test, prüft Slot-Analyse und Tooltip-Parser (lib.js)
 ```
+
+`tests/fixtures/ocr-*.json` enthalten die echte Tesseract-Ausgabe von Spiel-Screenshots (Bilder in `tests/fixtures/bilder/`).
+Die Parser-Tests laufen gegen diese Ausgaben. So lässt sich jede Parser-Änderung ohne Browser gegen echte Tooltips prüfen.
 
 ## Reiter
 

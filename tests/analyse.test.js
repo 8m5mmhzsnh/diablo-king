@@ -51,9 +51,11 @@ function item(over = {}) {
   }, over));
 }
 
+const katalogAffixe = { kategorien: { affixe: { 'einträge': ['Critical Strike Damage', 'Attack Speed', 'Strength', 'Lucky Hit Chance', 'Thorns',
+  'Willpower', 'Maximum Life', 'Dexterity', 'Vulnerable Damage'].map(name_en => ({ name_en })) } } };
 const run = (it, over = {}) => L.analysiereSlot(Object.assign({
   slotKey: 'waffe', item: it, build, andererBuild: ziel,
-  charakter: { qualstufe: 6 }, bestand: {}, wissen,
+  charakter: { qualstufe: 6 }, bestand: {}, wissen, katalog: katalogAffixe,
 }, over));
 const kat = (res, k) => res.aktionen.filter(a => a.kategorie === k);
 
@@ -152,7 +154,7 @@ test('Fehlender Zielaffix → schlechteste Zeile umrollen (in keinem Build gefra
 });
 
 test('Vermachtes Item: Verzaubern kostet Vergessene Seelen', () => {
-  const r = run(item({ vermacht: true, affixe: [{ text: 'Thorns', wert: '1' }] }));
+  const r = run(item({ vermacht: true, affixe: [{ text: 'Willpower', implizit: true }, { text: 'Thorns', wert: '1' }] }));
   assert.equal(kat(r, 'affixe')[0].material.de, 'Vergessene Seelen');
   assert.ok(r.infos.some(i => i.text === L.TEXT.seelen('Vergessene Seelen')));
 });
@@ -348,4 +350,101 @@ test('lib.js, app.js und inventar.js vertragen sich im selben globalen Scope (ke
   const path = require('node:path');
   const quelle = ['lib.js', 'app.js', 'inventar.js'].map(f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8')).join('\n;\n');
   assert.doesNotThrow(() => new vm.Script(quelle));
+});
+
+const uebersetzung = { affixe: { 'Willenskraft': 'Willpower', 'Maximales Leben': 'Maximum Life', 'Krit-Schaden': 'Critical Strike Damage' } };
+const deBuild = { id: 'de', name: 'DE', slots: { handschuhe: { zielAspekt: 'X', affixe: ['Willenskraft', 'Krit-Schaden', 'Maximales Leben'] } } };
+const handschuh = over => L.normalizeItem(Object.assign({ name: 'Glove', seltenheit: 'legendär', affixe: [
+  { text: 'Willpower', wert: '+225' }, { text: 'Maximum Life', wert: '+2047' }, { text: 'Thorns', wert: '+300' },
+] }, over));
+
+test('Deutsche Build-Affixe gegen englische Tooltips: Willenskraft = Willpower, kein Fehlalarm', () => {
+  const r = L.analysiereSlot({ slotKey: 'handschuhe', item: handschuh(), build: deBuild, charakter: { qualstufe: 8 }, bestand: {}, wissen, katalog: katalogAffixe, uebersetzung });
+  const v = r.aktionen.filter(a => a.kategorie === 'affixe');
+  assert.equal(v.length, 1);
+  assert.equal(v[0].text, 'Zeile „Thorns“ umrollen auf „Krit-Schaden (Critical Strike Damage)“');
+  assert.ok(!JSON.stringify(r).includes('Willenskraft (Willpower)“ fehlt'));
+});
+
+test('Ohne Übersetzung: kein „fehlt“ und keine Umroll-Empfehlung, sondern Hinweis „nicht vergleichbar“', () => {
+  const r = L.analysiereSlot({ slotKey: 'handschuhe', item: handschuh(), build: deBuild, charakter: { qualstufe: 8 }, bestand: {}, wissen, katalog: katalogAffixe, uebersetzung: {} });
+  assert.equal(r.aktionen.filter(a => a.kategorie === 'affixe').length, 0);
+  assert.ok(r.infos.some(i => /Nicht vergleichbar.*Willenskraft/.test(i.text)));
+});
+
+test('Primärattribut passt auf jedes Primärattribut (oder auf charakter.primaerattribut)', () => {
+  assert.ok(L.affixPasst('Willpower', 'Primärattribut', {}, {}));
+  assert.ok(L.affixPasst('Strength', 'Primärattribut', {}, {}));
+  assert.ok(!L.affixPasst('Strength', 'Primärattribut', {}, { primaerattribut: 'Willpower' }));
+  assert.ok(!L.affixPasst('Critical Strike Damage Multiplier', 'Critical Strike Damage', {}, {}), 'kein Teiltreffer');
+});
+
+test('Härtungs-Ziel mit Klammerzusatz wird übersetzt verglichen', () => {
+  assert.deepEqual(L.affixVarianten('Maximales Leben (Worldly Endurance)', uebersetzung.affixe), ['Maximales Leben', 'Maximum Life']);
+});
+
+// ---------- Echte Tesseract-Ausgaben (tests/fixtures/ocr-*.json, Bilder in tests/fixtures/bilder/) ----------
+const fixture = n => require(`./fixtures/ocr-${n}.json`);
+const echtesWissen = require('../data/wissen.json');
+const echterKatalog = require('../data/katalog.json');
+
+test('Echter Screenshot Stealth (Unique mit Runenwort, abgeschnittener Tooltip)', () => {
+  const r = L.parseTooltip(fixture('stealth'), { wissen: echtesWissen, katalog: echterKatalog });
+  assert.equal(r.item.name, 'Stealth');
+  assert.equal(r.item.seltenheit, 'einzigartig');
+  assert.equal(r.item.itemTyp, 'Chest Armor');
+  assert.equal(r.item.gegenstandsmacht, 850);
+  assert.deepEqual(r.item.affixe.map(a => [a.wert, a.text]), [
+    ['+1,671', 'Maximum Life'], ['15.0%', 'Resource Generation'], ['+25.0%', 'Attack Speed'],
+    ['+25%', 'Movement Speed'], ['15.0%', 'Damage Reduction'], ['25.0%', 'Impairment Reduction'],
+  ]);
+  assert.deepEqual(r.item.sockel, [{ gefuellt: true, inhalt: 'Cir' }, { gefuellt: true, inhalt: 'Ohm' }]);
+  assert.ok(r.hinweise.some(h => /abgeschnitten/.test(h)));
+  assert.equal(r.slot.key, 'brust');
+});
+
+test('Echter Screenshot Edgemaster\'s (großer und verzauberter Affix, x-Multiplikator)', () => {
+  const r = L.parseTooltip(fixture('edgemaster'), { wissen: echtesWissen, katalog: echterKatalog });
+  assert.equal(r.item.seltenheit, 'legendär');
+  assert.equal(r.item.vermacht, true);
+  assert.equal(r.item.itemTyp, 'Gloves');
+  assert.equal(r.item.gegenstandsmacht, 900);
+  assert.match(r.item.aspekt, /Edgemasters/);
+  assert.deepEqual(r.item.affixe.map(a => [a.wert, a.text, a.gross, a.verzaubert]), [
+    ['+225', 'Willpower', true, false],
+    ['+2,047', 'Maximum Life', false, false],
+    ['+293', 'Life on Hit', false, true],
+    ['x14%', 'Fire Damage Multiplier', false, false],
+  ]);
+  assert.deepEqual(r.item.haertungen, { genutzt: 4, max: 4, affix: '' });
+  assert.equal(r.slot.key, 'handschuhe');
+});
+
+test('Echter Screenshot Helm über die App-Pipeline', () => {
+  const r = L.parseTooltip(fixture('helm'), { wissen: echtesWissen, katalog: echterKatalog });
+  assert.equal(r.item.aspekt, 'Sadistischer Aspekt (Sadistic Aspect)');
+  assert.deepEqual(r.item.affixe.map(a => a.text), ['Willpower', 'Maximum Life', 'Armor', 'To Sigil of Chaos']);
+  assert.deepEqual(r.item.haertungen, { genutzt: 3, max: 3, affix: '' });
+});
+
+test('Echtes Profil: Handschuh mit Willpower meldet Willenskraft nicht als fehlend', () => {
+  const uebersetzung = require('../data/uebersetzungen.json');
+  const item = L.normalizeItem(L.parseTooltip(fixture('edgemaster'), { wissen: echtesWissen, katalog: echterKatalog }).item);
+  const build = { id: 'starter', name: 'Starter', slots: { handschuhe: {
+    zielAspekt: 'Aspekt des höllischen Befehlshabers (Hellbent Commander Aspect)',
+    affixe: ['Willenskraft', 'Krit-Schaden-Multiplikator', 'Verwundbar-Schaden-Multiplikator', 'Maximales Leben'],
+    haertung: 'Krit-Schaden (Worldly Finesse)' } } };
+  const r = L.analysiereSlot({ slotKey: 'handschuhe', item, build, charakter: { qualstufe: 8 }, bestand: {}, wissen: echtesWissen, katalog: echterKatalog, uebersetzung });
+  const text = JSON.stringify(r);
+  assert.ok(!/Willenskraft[^"]*fehlt/.test(text), 'Willenskraft darf nicht als fehlend gelten');
+  assert.ok(r.infos.some(i => /bereits an „Life on Hit“ gebunden/.test(i.text)));
+});
+
+test('Unique ohne markierte implizite Zeilen → keine Umroll-Empfehlung, sondern Bitte zum Markieren', () => {
+  const it = item({ affixe: [{ text: 'Thorns', wert: '1' }, { text: 'Attack Speed', wert: '8%' }] });   // item() ist ein Unique
+  const r = run(it);
+  assert.equal(kat(r, 'affixe').length, 0);
+  assert.ok(r.infos.some(i => /implizit.*markieren/.test(i.text)));
+  const it2 = item({ affixe: [{ text: 'Willpower', implizit: true }, { text: 'Thorns', wert: '1' }, { text: 'Attack Speed', wert: '8%' }] });
+  assert.equal(kat(run(it2), 'affixe').length, 1, 'mit markierter impliziter Zeile gibt es wieder eine Empfehlung');
 });

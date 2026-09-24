@@ -1,0 +1,31 @@
+{
+  "_info": "Deutsch → englische Affixnamen für den Vergleich von Build-Vorgaben (deutsch) mit Tooltips (englisch). Rechts steht der Name wie in katalog.json. Fehlt ein Begriff, meldet die App ihn als „nicht vergleichbar“ und schlägt dafür nichts vor. „Primärattribut“ ist eingebaut: passt auf Strength, Dexterity, Intelligence oder Willpower (oder auf charakter.primaerattribut, falls gesetzt).",
+  "schemaVersion": 2,
+  "affixe": {
+    "Willenskraft": "Willpower",
+    "Stärke": "Strength",
+    "Geschicklichkeit": "Dexterity",
+    "Intelligenz": "Intelligence",
+    "Maximales Leben": "Maximum Life",
+    "Angriffsgeschwindigkeit": "Attack Speed",
+    "Krit-Chance": "Critical Strike Chance",
+    "Krit-Schaden": "Critical Strike Damage",
+    "Krit-Schaden-Multiplikator": "Critical Strike Damage Multiplier",
+    "Verwundbar-Schaden-Multiplikator": "Vulnerable Damage Multiplier",
+    "Rüstung": "Armor",
+    "Widerstand gegen alle Elemente": "Resistance to All Elements",
+    "Feuerwiderstand": "Fire Resistance",
+    "Physischer Widerstand": "Physical Resistance",
+    "Bewegungstempo": "Movement Speed",
+    "Abklingzeitreduktion": "Cooldown Reduction",
+    "Beeinträchtigungsreduktion": "Impairment Reduction",
+    "Ressourcenerzeugung": "Resource Generation",
+    "Ressourcenkostenreduktion": "Resource Cost Reduction",
+    "Schadensreduktion": "Damage Reduction",
+    "Zornregeneration": "Wrath Regeneration",
+    "Leben pro Treffer": "Life on Hit",
+    "Ränge zu Sengender Schrei": "To Blazing Scream",
+    "Ränge zu Dämonologie-Fertigkeiten": "To Demonology Skills",
+    "Ränge zu allen Fertigkeiten": "To All Skills"
+  }
+}

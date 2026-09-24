@@ -109,8 +109,17 @@ const slugify = s => norm(s).replace(/ /g, '-');
 
 /* ---------------- Wissen-Helfer (mit explizitem wissen) ---------------- */
 
+/** seltenheitSynonyme als Liste – versteht auch die Kurzform { id: [synonyme] }. */
+function seltListe(wissen) {
+  const s = wissen && wissen.seltenheitSynonyme;
+  if (s && !Array.isArray(s) && typeof s === 'object') {
+    return Object.entries(s).map(([id, syn]) => ({ id, synonyme: asArray(syn) }));
+  }
+  return asArray(s);
+}
+
 function seltenheitAus(wissen, token) {
-  for (const s of asArray(wissen && wissen.seltenheitSynonyme)) {
+  for (const s of seltListe(wissen)) {
     for (const syn of [s.id, ...asArray(s.synonyme)]) {
       const n = norm(syn);
       if (n && !n.includes(' ') && wordEq(token, n)) return s.id;
@@ -121,7 +130,7 @@ function seltenheitAus(wissen, token) {
 function seltenheitKanon(wissen, wert) {
   const n = norm(wert);
   if (!n) return '';
-  for (const s of asArray(wissen && wissen.seltenheitSynonyme)) {
+  for (const s of seltListe(wissen)) {
     if ([s.id, s.name_de, s.name_en, ...asArray(s.synonyme)].some(x => norm(x) === n)) return s.id;
   }
   return seltenheitAus(wissen, n) || wert;
@@ -313,6 +322,53 @@ function istUnique(wissen, seltenheit) {
 }
 
 /* ================================================================
+   Affix-Vergleich über Sprachen hinweg
+   ================================================================ */
+
+/** Primärattribute – „Primärattribut“ im Build passt auf jedes davon (oder auf charakter.primaerattribut). */
+const PRIMAERATTRIBUTE = ['Strength', 'Dexterity', 'Intelligence', 'Willpower'];
+
+/**
+ * Englische Entsprechungen eines Build-Affixes. Quelle: data/uebersetzungen.json (affixe) und optional
+ * wissen.affixUebersetzungen. Klammerzusätze wie „(Worldly Endurance)“ werden ignoriert.
+ */
+function affixVarianten(ziel, uebersetzung, charakter) {
+  const basis = String(ziel || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+  const out = [basis];
+  const tab = uebersetzung || {};
+  const key = Object.keys(tab).find(k => norm(k) === norm(basis));
+  if (key) out.push(...asArray(tab[key]));
+  if (/^prim(ä|ae|a)rattribut$|^primary attribute$|^hauptattribut$/i.test(basis)) {
+    const eigen = charakter && charakter.primaerattribut;
+    out.push(...(eigen ? affixVarianten(eigen, tab, null) : PRIMAERATTRIBUTE));
+  }
+  return [...new Set(out.filter(Boolean))];
+}
+/** Gleicher Affix? Streng: normalisiert gleich (OCR-tolerant), nicht bloß enthalten. */
+function affixGleich(a, b) {
+  const x = norm(a), y = norm(b);
+  if (!x || !y) return false;
+  return x === y || ocrForm(a) === ocrForm(b) || phraseEq(x, y);
+}
+function affixPasst(itemText, ziel, uebersetzung, charakter) {
+  return affixVarianten(ziel, uebersetzung, charakter).some(v => affixGleich(itemText, v));
+}
+/**
+ * Lässt sich ein Build-Affix mit englischen Tooltip-Texten vergleichen? Nur dann darf die App
+ * „fehlt“ behaupten. Vergleichbar = es gibt eine Übersetzung, oder der Text ist selbst ein Katalog-Affix.
+ */
+function affixVergleichbar(ziel, uebersetzung, charakter, katalogAffixe) {
+  const v = affixVarianten(ziel, uebersetzung, charakter);
+  if (v.length > 1) return true;
+  return asArray(katalogAffixe).some(k => affixGleich(k, v[0]));
+}
+function affixAnzeige(ziel, uebersetzung, charakter) {
+  const v = affixVarianten(ziel, uebersetzung, charakter);
+  const en = v.slice(1);
+  return en.length === 1 ? bi(v[0], en[0]) : en.length > 1 ? `${v[0]} (${en.join(' / ')})` : v[0];
+}
+
+/* ================================================================
    Slot-Analyse
    ================================================================ */
 
@@ -332,7 +388,10 @@ const TEXT = {
  * Arbeitet nur auf bestätigten Werten aus profil.inventar.
  * @returns {{aktionen: object[], infos: object[], reihenfolge: object[], keeper: boolean, passt: boolean|null, ziel: object}}
  */
-function analysiereSlot({ slotKey, item, build, andererBuild, charakter, bestand, wissen }) {
+function analysiereSlot({ slotKey, item, build, andererBuild, charakter, bestand, wissen, uebersetzung, katalog }) {
+  const tab = Object.assign({}, (uebersetzung && uebersetzung.affixe) || uebersetzung || {}, (wissen && wissen.affixUebersetzungen) || {});
+  const katAff = katalogListe(katalog, 'affixe').map(a => a.name_en);
+  const passt = (text, ziel) => affixPasst(text, ziel, tab, charakter);
   const out = { aktionen: [], infos: [], reihenfolge: [], keeper: false, passt: null, ziel: {} };
   const info = (kategorie, text, art = 'info') => out.infos.push({ kategorie, text, art });
   const aktion = a => out.aktionen.push(Object.assign({ prio: 'mittel', gruppe: 'gold', grund: '' }, a));
@@ -403,7 +462,8 @@ function analysiereSlot({ slotKey, item, build, andererBuild, charakter, bestand
       falsch.frei = false;
       aktion({
         kategorie: 'sockel', gruppe: 'gold', prio: 'mittel',
-        text: `„${falsch.inhalt}“ ersetzen durch „${req}“. Der alte Edelstein ist nicht verloren.`,
+        // Die Zusage gilt nur für Edelsteine – bei Runen ist sie nicht belegt
+        text: RE_GEM.test(falsch.inhalt) ? `„${falsch.inhalt}“ ersetzen durch „${req}“. Der alte Edelstein ist nicht verloren.` : `„${falsch.inhalt}“ ersetzen durch „${req}“.`,
         grund: `Build sieht „${req}“ vor.`,
       });
     } else if (wirdErsetzt) {
@@ -423,34 +483,43 @@ function analysiereSlot({ slotKey, item, build, andererBuild, charakter, bestand
   info('affixe', TEXT.einAffix, 'warn');
   const affixe = asArray(item.affixe);
   const verzaubert = affixe.find(a => a.verzaubert);
-  const fehlend = zielAffixe.filter(z => !affixe.some(a => textPasst(a.text, z)));
+  // Nur vergleichbare Zielaffixe dürfen als „fehlt“ gelten – sonst entstehen Fehlalarme (Willenskraft ≠ Willpower)
+  const unvergleichbar = zielAffixe.filter(z => !affixVergleichbar(z, tab, charakter, katAff) && !affixe.some(a => passt(a.text, z)));
+  const fehlend = zielAffixe.filter(z => !unvergleichbar.includes(z) && !affixe.some(a => passt(a.text, z)));
+  if (unvergleichbar.length) {
+    info('affixe', `Nicht vergleichbar (keine Übersetzung): ${unvergleichbar.join(', ')} – in data/uebersetzungen.json ergänzen. Diese Zeilen gelten weder als vorhanden noch als fehlend.`, 'unsicher');
+  }
   if (wirdErsetzt) {
     info('affixe', 'Nicht verzaubern – das Teil wird ersetzt.');
   } else if (verzaubert) {
     info('affixe', `Dieses Item ist bereits an „${verzaubert.text}“ gebunden, andere Affixe sind nicht mehr umrollbar.`);
   } else if (!zielAffixe.length) {
     info('affixe', 'Keine Affix-Prioritäten im Build hinterlegt – keine Verzauber-Empfehlung möglich.');
+  } else if (fehlend.length && unique && !affixe.some(a => a.implizit)) {
+    info('affixe', `Es fehlt vermutlich „${affixAnzeige(fehlend[0], tab, charakter)}“. Bei Uniques sind die oberen Zeilen fest (implizit) – bitte im Item markieren. Bis dahin keine Umroll-Empfehlung, sonst könnte die App eine feste Zeile vorschlagen.`, 'warn');
+  } else if (fehlend.length && unvergleichbar.length) {
+    info('affixe', `Es fehlt vermutlich „${affixAnzeige(fehlend[0], tab, charakter)}“. Keine Umroll-Empfehlung, solange „${unvergleichbar.join('“, „')}“ nicht vergleichbar ist – sonst könnte die App eine gute Zeile zum Umrollen vorschlagen.`, 'warn');
   } else if (fehlend.length) {
     const kandidaten = affixe
-      .filter(a => !a.implizit && !zielAffixe.some(z => textPasst(a.text, z)))
-      .map(a => ({ a, anderer: andereAffixe.some(z => textPasst(a.text, z)) }))
+      .filter(a => !a.implizit && !zielAffixe.some(z => passt(a.text, z)))
+      .map(a => ({ a, anderer: andereAffixe.some(z => passt(a.text, z)) }))
       .sort((x, y) => Number(x.anderer) - Number(y.anderer));   // in keinem Build gefragt = am wenigsten nützlich
     if (kandidaten.length) {
       const k = kandidaten[0], ziel = fehlend[0], rang = zielAffixe.indexOf(ziel);
       aktion({
         kategorie: 'affixe', gruppe: item.vermacht ? 'material' : 'gold', prio: rang < 2 ? 'hoch' : 'mittel',
-        text: `Zeile „${k.a.text}“ umrollen auf „${ziel}“`,
-        grund: `„${ziel}“ fehlt (Priorität ${rang + 1} im Build). „${k.a.text}“ ist ${k.anderer ? 'nur im anderen Build gefragt' : 'in keinem Build gefragt'}.`,
+        text: `Zeile „${k.a.text}“ umrollen auf „${affixAnzeige(ziel, tab, charakter)}“`,
+        grund: `„${affixAnzeige(ziel, tab, charakter)}“ fehlt (Priorität ${rang + 1} im Build). „${k.a.text}“ ist ${k.anderer ? 'nur im anderen Build gefragt' : 'in keinem Build gefragt'}.`,
         kandidaten: kandidaten.map(x => `${x.a.text}${x.anderer ? ' (anderer Build)' : ''}`),
         material: item.vermacht ? mat('verzaubernVermacht', 10) : null,
       });
     } else {
-      info('affixe', `Es fehlt „${fehlend[0]}“, aber alle umrollbaren Zeilen sind schon Zielaffixe.`);
+      info('affixe', `Es fehlt „${affixAnzeige(fehlend[0], tab, charakter)}“, aber alle umrollbaren Zeilen sind schon Zielaffixe.`);
     }
   }
   if (!wirdErsetzt && item.vermacht && !verzaubert) info('affixe', TEXT.seelen(mat('verzaubernVermacht', 10).de));
   info('affixe', TEXT.grossUnsicher, 'unsicher');
-  if (!wirdErsetzt && zielAffixe.length && !fehlend.length && affixe.some(a => a.schwach)) {
+  if (!wirdErsetzt && zielAffixe.length && !fehlend.length && !unvergleichbar.length && affixe.some(a => a.schwach)) {
     const rezept = asArray(wissen && wissen.rezepte).find(r => r.id === 'reroll-affixwerte');
     aktion({
       kategorie: 'affixe', gruppe: 'material', prio: 'niedrig',
@@ -477,7 +546,7 @@ function analysiereSlot({ slotKey, item, build, andererBuild, charakter, bestand
         warnung: rollen ? '' : TEXT.keinReset,
       });
     }
-  } else if (h.affix && slot.haertung && !textPasst(h.affix, slot.haertung)) {
+  } else if (h.affix && slot.haertung && !passt(h.affix, slot.haertung)) {
     if (keeper && rollen > 0) {
       aktion({
         kategorie: 'haerten', gruppe: 'material', prio: 'niedrig',
@@ -594,22 +663,29 @@ function slotVorschlag({ itemTyp, name, katalog, inventar, wissen }) {
   return { key, warum };
 }
 
-/* Fußzeilen: werden übersprungen, beenden aber das Lesen nicht (danach kommen z. B. noch „Tempers: 3/3“). */
-const RE_FUSS = /(requires level|benötigt stufe|sell value|verkaufswert|durability|haltbarkeit|account bound|accountgebunden|right mouse|rechtsklick|unique equipped|only one|kann nur|properties lost|eigenschaften gehen|lord of hatred|vessel of hatred|item$|season|saison)/i;
+/* Fußzeilen und Spiel-UI unter dem Tooltip: werden übersprungen (danach kommt nur noch „Tempers: x/y“). */
+const RE_FUSS = /(requires level|benötigt stufe|sell value|verkaufswert|durability|haltbarkeit|account bound|accountgebunden|right mouse|rechtsklick|unique equipped|only one|kann nur|properties lost|eigenschaften gehen|lord of hatred|vessel of hatred|seasonal item|saisonal|scroll down|unequip|ablegen|mark as favorite|favorit|(^|\s)link$|verknüpfen|not equipped)/i;
 const RE_KOPF = /^(equipped|ausgerüstet|angelegt|currently equipped)$/i;
 const RE_BASIS = /^[\d.,]+\s+(armou?r|rüstung|damage per second|schaden pro sekunde|block chance)\b|damage per hit|schaden pro treffer|attacks? per second|angriffe pro sekunde|^\s*\[\s*[\d.,]+\s*-\s*[\d.,]+\s*\]\s*damage/i;
 const RE_POWER = /(\d{2,4})\s*(item power|gegenstandsmacht)|(item power|gegenstandsmacht)\D{0,4}(\d{2,4})/i;
 const RE_HAERT = /(temper\w*|härtung\w*|gehärtet)\D{0,12}(\d+)\s*\/\s*(\d+)/i;
 const RE_VOLL = /(masterwork\w*|vollend\w*)\D{0,12}(\d+)\s*\/\s*(\d+)/i;
 const RE_LEER = /(empty socket|leerer sockel|freier sockel)/i;
-const RE_GEM = /\b(ruby|sapphire|emerald|topaz|amethyst|diamond|skull|rubin|saphir|smaragd|topas|amethyst|diamant|schädel)\b/i;
+/* Edelstein im Sockel: Zeile beginnt mit (Qualität +) Edelsteinname – nicht irgendwo im Effekttext. */
+const RE_GEM = /^(?:royal|grand|flawless|chipped|crude|königlich\w*|makellos\w*|grob\w*)?\s*(ruby|sapphire|emerald|topaz|amethyst|diamond|skull|rubin|saphir|smaragd|topas|diamant|schädel)\b/i;
 const RE_ANCESTRAL = /\b(ancestral|vermacht|vermächtnis\w*)\b/i;
-/* Beginn eines Effekt-Absatzes (Aspekt oder Unique-Kraft) – gehört nicht zu den Affixen. */
-const RE_EFFEKT = /^(imprinted|geprägt|aufgeprägt|unique power|einzigartige kraft)\s*:/i;
-/* Aufzählungszeichen, die Tesseract aus ◆ / ★ macht: o ¢ © e * • … – nur vor einem Wert. */
-const RE_OCR_BULLET = /^([^\p{L}\p{N}+\-\[]{1,3}|[oOeEcCaQ0])\s+(?=[+\-]?\d)/u;
-/* Stern als Aufzählungszeichen = vermutlich großer Affix. */
-const RE_STERN = /^[*★✦✧☆]\s*/;
+/* Beginn eines Effekt-Absatzes (Aspekt, Unique-Kraft, Runenwort) – gehört nicht zu den Affixen. */
+const RE_EFFEKT = /^(imprinted|geprägt|aufgeprägt|unique power|einzigartige kraft)\s*:|\(\s*\d+\s*\/\s*\d+\s*\)/i;
+/* Runen im Sockel: „CirOhm (300/600) - Lethargic Call to Arms“ → Sockel mit Cir und Ohm. */
+const RE_RUNEN_SOCKEL = /^([A-Z][a-z]{1,5}(?:[A-Z][a-z]{1,5})+)\s*\(\s*\d+\s*\/\s*\d+\s*\)/;
+/* Aufzählungszeichen, die Tesseract aus ◆ macht: o ¢ © e … – nur vor einem Wert. */
+const RE_OCR_BULLET = /^([^\p{L}\p{N}+\-\[]{1,3}|[oOeEcCaQ0])\s+(?=[+\-x×]?\s*\d)/u;
+/* Stern (✹/★) als Aufzählungszeichen = großer Affix. */
+const RE_STERN = /^[*★✦✧☆✹]\s*/;
+/* Ein Affix beginnt mit einem Wert: +85, 15.0%, x14% (Multiplikator) – oder ist ein Glückstreffer. */
+const RE_AFFIX_START = /^([+\-x×]?\s*\d[\d.,]*\s*%?)\s+(.+)$/i;
+/* Zusätzliche englische Item-Typ-Wörter (Tooltip-Schreibweise), neben den Katalog-Typen. */
+const ITEMTYP_EXTRA = ['Pants', 'Chest Armor', 'Two-Handed Sword', 'Two-Handed Axe', 'Two-Handed Mace', 'Two-Handed Scythe', 'Totem', 'Offhand'];
 
 /** Levenshtein-Distanz (für Katalog-Abgleich von OCR-Text). */
 function distanz(a, b) {
@@ -625,13 +701,14 @@ function distanz(a, b) {
   return prev[n];
 }
 
+/** Typische OCR-Verwechslungen angleichen: rn↔m, vv↔w, cl↔d, 0↔o, 1/l↔i, Apostrophe weg. */
+const ocrForm = s => norm(String(s || '').replace(/['’`]/g, '')).replace(/rn/g, 'm').replace(/vv/g, 'w').replace(/cl/g, 'd').replace(/0/g, 'o').replace(/[1l]/g, 'i');
+const kompakt = s => tokens(String(s || '').replace(/['’`]/g, ''));
+
 /**
  * Sucht den passenden Namen in einer Liste: exakt (normalisiert) oder mit kleinem Tippfehler.
  * @returns {{name: string, exakt: boolean}|null}
  */
-/** Typische OCR-Verwechslungen angleichen: rn↔m, vv↔w, cl↔d, 0↔o, 1/l↔i. */
-const ocrForm = s => norm(s).replace(/rn/g, 'm').replace(/vv/g, 'w').replace(/cl/g, 'd').replace(/0/g, 'o').replace(/[1l]/g, 'i');
-
 function namenAbgleich(text, namen, maxAnteil = 0.2) {
   const n = ocrForm(text);
   if (!n) return null;
@@ -647,62 +724,103 @@ function namenAbgleich(text, namen, maxAnteil = 0.2) {
   return best && bestD <= Math.max(1, Math.floor(n.length * maxAnteil)) ? { name: best, exakt: false } : null;
 }
 
-/** Bereinigt eine OCR-Zeile: Glyphen, Bereichsangaben [x - y], [+] und Streuzeichen raus. */
+/** OCR-tolerantes Wort-Gleich: „edgeimasters“ ≈ „edgemasters“, „vaimibraces“ ≈ „vambraces“. */
+function wortOcrGleich(x, y) {
+  if (x === y) return true;
+  const a = ocrForm(x), b = ocrForm(y);
+  if (a === b) return true;
+  if (b.length >= 5 && a.length > b.length && a.length - b.length <= 2 && a.endsWith(b)) return true;
+  return b.length >= 5 && distanz(a, b) <= (b.length >= 9 ? 2 : 1);
+}
+
+/** Findet einen bekannten Namen als zusammenhängende Wortfolge in verrauschtem OCR-Text („iy STEALTH FE“ → Stealth). */
+function namenInText(text, namen) {
+  const t = kompakt(text);
+  let best = null;
+  for (const n of namen) {
+    const k = kompakt(n);
+    if (!k.length || k.length > t.length) continue;
+    if (k.length === 1 && k[0].length < 4) continue;
+    for (let i = 0; i + k.length <= t.length; i++) {
+      if (k.every((w, j) => wortOcrGleich(t[i + j], w))) {
+        if (!best || k.join(' ').length > kompakt(best).join(' ').length) best = n;
+        break;
+      }
+    }
+  }
+  return best;
+}
+
+/** Bereinigt eine OCR-Zeile: Glyphen, Bereichsangaben [x - y], [+], [x] und Streuzeichen raus. */
 function ocrZeile(t) {
   return String(t || '')
-    .replace(/\+?\s*\[[^\]]*\]\s*%?/g, ' ')           // +[83 - 99], [1,016 - 1,225], [30 - 50]%
-    .replace(/[\[\]{}|\\¦]/g, ' ')                      // übrig gebliebene Klammern/Striche
-    .replace(/[©®™¢¥£€§¤°º¹²³@#^~`´¨«»<>]/g, ' ')       // typische Fehlglyphen (Icons, Gold-Symbol)
+    .replace(/\+?\s*\[[^\]]*\]\s*%?/g, ' ')           // +[83 - 99], [1,016 - 1,225], [30 - 50]%, [x]
+    .replace(/\+?\s*\[[^\]]*$/g, ' ')                  // umgebrochen: „[14 -“ am Zeilenende
+    .replace(/^[^\[]*\]\s*%?/g, ' ')                   // umgebrochen: „24]%“ am Zeilenanfang
+    .replace(/[\[\]{}|\\¦]/g, ' ')
+    .replace(/[©®™¢¥£€§¤°º¹²³@#^~`´¨«»<>$]/g, ' ')    // typische Fehlglyphen (Icons, Gold-Symbol)
     .replace(/\s+/g, ' ')
     .trim();
 }
 
 /** Aspekt aus dem Namen eines legendären Items: „Sadistic Doom Casque“ → Sadistic, „… of Ignition“ → Aspect of Ignition. */
 function aspektAusName(name, { wissen, katalog } = {}) {
-  const nt = tokens(name);
+  const nt = kompakt(name);
   if (!nt.length) return null;
   const katalogAspekte = katalogListe(katalog, 'aspekte').map(a => a.name_en).filter(Boolean);
   const wissenAspekte = asArray(wissen && wissen.eintraege).filter(e => norm(e.typ) === 'aspekt');
   const kandidaten = [...new Set([...katalogAspekte, ...wissenAspekte.map(e => String(e.name_en || '').replace(/\s*aspect\s*|\s*aspekt\s*/ig, ' ').replace(/^of /i, '').trim())])]
-    .filter(Boolean).map(a => ({ a, t: tokens(a) })).sort((x, y) => y.t.length - x.t.length);
-  const tokEq = (x, y) => x === y || (y.length >= 5 && x.length > y.length && x.length - y.length <= 2 && x.endsWith(y)) || (y.length >= 6 && distanz(x, y) <= 1);
+    .filter(Boolean).map(a => ({ a, t: kompakt(a) })).filter(x => x.t.length).sort((x, y) => y.t.length - x.t.length);
   for (const { a, t } of kandidaten) {
-    // Präfix-Form: die ersten Wörter des Namens
-    if (t.length <= nt.length && t.every((x, k) => tokEq(nt[k], x))) return aspektAnzeige(a, wissenAspekte);
-    // „… of X“-Form
+    if (t.length <= nt.length && t.every((x, k) => wortOcrGleich(nt[k], x))) return aspektAnzeige(a, wissenAspekte);
     const of = nt.indexOf('of');
-    if (of >= 0 && t.length === nt.length - of - 1 && t.every((x, k) => tokEq(nt[of + 1 + k], x))) return aspektAnzeige(a, wissenAspekte);
+    if (of >= 0 && t.length === nt.length - of - 1 && t.every((x, k) => wortOcrGleich(nt[of + 1 + k], x))) return aspektAnzeige(a, wissenAspekte);
   }
   return null;
 }
 function aspektAnzeige(kern, wissenAspekte) {
-  const k = norm(kern);
-  const e = wissenAspekte.find(x => hasWords(norm(x.name_en), k));
+  const k = kompakt(kern).join(' ');
+  const e = wissenAspekte.find(x => hasWords(kompakt(x.name_en).join(' '), k));
   return e ? bi(e.name_de, e.name_en) : `${kern} Aspect`;
+}
+
+/** Item-Typ aus der Typzeile, nur bekannte Wörter („Chest Armor ON“ → „Chest Armor“). */
+function itemTypAus(text, katalog) {
+  const vokabular = [...katalogListe(katalog, 'itemTypen').map(t => String(t.name_en || t.slug || '').replace(/2H$/, '').replace(/([a-z])([A-Z])/g, '$1 $2')), ...ITEMTYP_EXTRA]
+    .filter(Boolean).sort((a, b) => b.length - a.length);
+  const t = norm(text);
+  const hit = vokabular.find(v => hasWords(t, norm(v)));
+  if (hit) return hit;
+  // Fallback: nur Wörter aus Buchstaben mit mindestens 3 Zeichen
+  return String(text).split(/\s+/).filter(w => /^[\p{L}-]{3,}$/u.test(w)).join(' ');
 }
 
 /**
  * Macht aus OCR-Zeilen einen Entwurf. Das Ergebnis ist NIE direkt Inventar –
  * es wird im Formular angezeigt und erst nach Bestätigung übernommen.
- * @param {{text: string, confidence?: number}[]} lines
+ * @param {{text: string, confidence?: number, symbol?: 'verzaubert'|null}[]} lines
  */
 function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
   const roh = asArray(lines)
     .map(l => (typeof l === 'string' ? { text: l, confidence: null } : l))
-    .map(l => ({ roh: String(l.text || '').replace(/\s+/g, ' ').trim(), confidence: l.confidence == null ? null : Math.round(l.confidence) }));
-  // Zeilen ohne echten Text (Rahmen, Icons, Bildreste) verwerfen
-  const clean = roh.map(l => ({ ...l, text: ocrZeile(l.roh) }))
-    .filter(l => {
-      const buchst = (l.text.match(/[\p{L}\p{N}]/gu) || []).length;
-      if (buchst < 2) return false;
-      if (l.confidence != null && l.confidence < 45 && buchst / l.text.length < 0.7) return false;
-      return !RE_KOPF.test(l.text);
-    });
+    .map(l => ({ roh: String(l.text || '').replace(/\s+/g, ' ').trim(), confidence: l.confidence == null ? null : Math.round(l.confidence), symbol: l.symbol || null }));
+  // Zeilen ohne echten Text (Rahmen, Icons, Bildreste) verwerfen. Ein einzelner Stern gehört zur nächsten Zeile.
+  const clean = [];
+  let sternDavor = false;
+  for (const l of roh) {
+    if (/^[*★✦✧☆✹]+$/.test(l.roh)) { sternDavor = true; continue; }
+    const text = ocrZeile(l.roh);
+    const buchst = (text.match(/[\p{L}\p{N}]/gu) || []).length;
+    if (buchst < 2 || RE_KOPF.test(text)) continue;
+    if (l.confidence != null && l.confidence < 45 && buchst / text.length < 0.7) continue;
+    clean.push({ ...l, text, stern: sternDavor || RE_STERN.test(l.roh) });
+    sternDavor = false;
+  }
   const item = leeresItem();
   item.quelle = 'ocr';
   const affixe = [];
   const hinweise = [];
-  const selt = asArray(wissen && wissen.seltenheitSynonyme);
+  const selt = seltListe(wissen);
   const seltenheitIn = text => {
     for (const t of tokens(text)) {
       const id = seltenheitAus(wissen, t);
@@ -720,28 +838,34 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
     if (s) item.seltenheit = s.id;
     item.vermacht = RE_ANCESTRAL.test(tl);
     const rarityWords = new Set(selt.flatMap(x => [x.id, ...asArray(x.synonyme)]).map(norm));
-    item.itemTyp = tl.split(/\s+/).filter(w => !rarityWords.has(norm(w)) && !RE_ANCESTRAL.test(w) && !/^(sacred|heilig\w*)$/i.test(w)).join(' ').trim();
-    // Name: bis zu zwei Zeilen direkt über der Typzeile
-    item.name = clean.slice(Math.max(0, typIdx - 2), typIdx).map(l => l.text).join(' ').trim();
+    const rest = tl.split(/\s+/).filter(w => !rarityWords.has(norm(w)) && !RE_ANCESTRAL.test(w) && !/^(sacred|heilig\w*)$/i.test(w)).join(' ');
+    item.itemTyp = itemTypAus(rest, katalog);
+    // Name: bis zu drei Zeilen direkt über der Typzeile, nur Zeilen, die überwiegend aus Buchstaben bestehen
+    const nameZeilen = clean.slice(Math.max(0, typIdx - 3), typIdx)
+      .filter(l => (l.text.match(/\p{L}/gu) || []).length / l.text.replace(/\s/g, '').length >= 0.6);
+    item.name = nameZeilen.map(l => l.text).join(' ');
   }
   if (!item.name && clean.length) item.name = clean[0].text;
-  item.name = item.name.replace(/[^\p{L}\p{N}' \-]/gu, '').replace(/\s+/g, ' ').trim();
+  item.name = item.name.replace(/[^\p{L}\p{N}'’ \-]/gu, ' ').replace(/\s+/g, ' ').trim();
 
-  // Unique-Namen mit Katalog und Wissen abgleichen (OCR-Tippfehler korrigieren)
+  // Uniques/Runenwörter: bekannten Namen im (verrauschten) OCR-Namen suchen
   const unique = istUnique(wissen, item.seltenheit);
-  if (unique && item.name) {
-    const namen = [
-      ...asArray(wissen && wissen.eintraege).filter(e => ['unique', 'mythisch', 'mythic'].includes(norm(e.typ))).flatMap(e => [e.name_en, e.name_de]),
-      ...katalogListe(katalog, 'uniques').map(u => u.name_en),
-    ].filter(Boolean);
-    const hit = namenAbgleich(item.name, namen, 0.25);
-    if (hit && !hit.exakt) hinweise.push(`Name „${item.name}“ zu „${hit.name}“ korrigiert (Katalog) – bitte prüfen.`);
-    if (hit) item.name = hit.name;
+  const bekannte = [
+    ...asArray(wissen && wissen.eintraege).filter(e => ['unique', 'mythisch', 'mythic', 'runenwort', 'runeword'].includes(norm(e.typ))).flatMap(e => [e.name_en, e.name_de]),
+    ...katalogListe(katalog, 'uniques').map(u => u.name_en),
+  ].filter(Boolean);
+  const gefunden = unique && item.name ? (namenInText(item.name, bekannte) || (namenAbgleich(item.name, bekannte, 0.25) || {}).name) : null;
+  if (gefunden) {
+    if (norm(gefunden) !== norm(item.name)) hinweise.push(`Name „${item.name}“ als „${gefunden}“ erkannt (Wissen/Katalog) – bitte prüfen.`);
+    item.name = gefunden;
   } else if (item.name) {
-    // Legendäre Items: Namen in Groß/Klein normalisieren, Aspekt aus dem Namen ableiten
-    item.name = item.name.toLowerCase().replace(/(^|\s)\p{L}/gu, m => m.toUpperCase());
-    const asp = aspektAusName(item.name, { wissen, katalog });
-    if (asp) { item.aspekt = asp; hinweise.push(`Aspekt „${asp}“ aus dem Item-Namen abgeleitet – bitte prüfen.`); }
+    // Wörter mit Satzzeichen/Rauschen raus, Groß/Klein normalisieren
+    item.name = item.name.split(' ').filter(w => /\p{L}{2,}/u.test(w)).join(' ')
+      .toLowerCase().replace(/(^|\s)\p{L}/gu, m => m.toUpperCase());
+    if (!unique) {
+      const asp = aspektAusName(item.name, { wissen, katalog });
+      if (asp) { item.aspekt = asp; hinweise.push(`Aspekt „${asp}“ aus dem Item-Namen abgeleitet – bitte prüfen.`); }
+    }
   }
   item.slug = slugify(item.name);
 
@@ -751,25 +875,30 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
   for (let i = typIdx >= 0 ? typIdx + 1 : 1; i < clean.length; i++) {
     const l = clean[i];
     const t = l.text;
-    const p = t.match(RE_POWER);
-    if (p) { item.gegenstandsmacht = Number(p[1] || p[4]); modus = 'affixe'; letztes = null; continue; }
-    if (RE_ANCESTRAL.test(t) && t.length < 30) { item.vermacht = true; continue; }
     const hm = t.match(RE_HAERT);
     if (hm) { item.haertungen.genutzt = Number(hm[2]); item.haertungen.max = Number(hm[3]); letztes = null; continue; }
     const vm = t.match(RE_VOLL);
     if (vm) { item.vollendung.stufe = Number(vm[2]); item.vollendung.max = Number(vm[3]); letztes = null; continue; }
-    if (RE_LEER.test(t)) { item.sockel.push({ gefuellt: false, inhalt: '' }); letztes = null; continue; }
-    const gem = t.match(RE_GEM);
-    if (gem && t.length < 40 && !/%/.test(t)) { item.sockel.push({ gefuellt: true, inhalt: t.replace(RE_OCR_BULLET, '') }); letztes = null; continue; }
+    if (/scroll down|runterscrollen/i.test(t) && !hinweise.some(h => /abgeschnitten/.test(h))) {
+      hinweise.push('Tooltip ist abgeschnitten („Scroll Down“) – Härtungen und Vollendung stehen weiter unten. Im Spiel runterscrollen und erneut aufnehmen oder von Hand prüfen.');
+    }
     if (RE_FUSS.test(t)) { modus = 'fuss'; letztes = null; continue; }
     if (modus === 'fuss') continue;
+    const p = t.match(RE_POWER);
+    if (p) { item.gegenstandsmacht = Number(p[1] || p[4]); modus = 'affixe'; letztes = null; continue; }
+    if (RE_ANCESTRAL.test(t) && t.length < 30) { item.vermacht = true; continue; }
+    const ohneBullet = t.replace(RE_OCR_BULLET, '').replace(RE_STERN, '');
+    if (RE_LEER.test(t)) { item.sockel.push({ gefuellt: false, inhalt: '' }); letztes = null; continue; }
+    const gem = ohneBullet.match(RE_GEM);
+    if (gem && ohneBullet.length < 40 && !/%/.test(ohneBullet)) { item.sockel.push({ gefuellt: true, inhalt: ohneBullet }); letztes = null; continue; }
     if (RE_BASIS.test(t)) { modus = 'affixe'; letztes = null; continue; }
 
-    const stern = RE_STERN.test(l.roh);
-    const ohneBullet = t.replace(RE_OCR_BULLET, '').replace(RE_STERN, '');
+    const runen = ohneBullet.match(RE_RUNEN_SOCKEL);
+    if (runen) runen[1].split(/(?=[A-Z])/).forEach(r => item.sockel.push({ gefuellt: true, inhalt: r }));
+    // Effekt-Absatz (Aspekt, Unique-Kraft, Runenwort): bis zu den Fußzeilen ist nichts mehr ein Affix
     if (RE_EFFEKT.test(ohneBullet)) { modus = 'effekt'; letztes = null; continue; }
-    const istAffix = /^[+\-]?\s*\d/.test(ohneBullet) || /^(lucky hit|glückstreffer)\s*:/i.test(ohneBullet);
-    if (modus === 'effekt' && !istAffix) continue;
+    if (modus === 'effekt') continue;
+    const istAffix = RE_AFFIX_START.test(ohneBullet) || /^(lucky hit|glückstreffer)\s*:/i.test(ohneBullet);
     // Fortsetzung einer umgebrochenen Affixzeile: kurz, ohne Zahl, ohne Satzende
     if (letztes && !istAffix && ohneBullet.split(' ').length <= 3 && !/\d|[.!?]$/.test(ohneBullet)) {
       letztes.text = `${letztes.text} ${ohneBullet}`.trim();
@@ -781,11 +910,12 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
       continue;
     }
     modus = 'affixe';
-    const m = ohneBullet.match(/^([+\-]?\s*[\d.,]+\s*%?)\s+(.+)$/);
+    const m = ohneBullet.match(RE_AFFIX_START);
+    const text = (m ? m[2] : ohneBullet).replace(/(\s+[\d.,]+%?)+$/, '').replace(/[+\-%\s]+$/, '').trim();
+    if (!/\p{L}{2,}/u.test(text)) { letztes = null; continue; }   // nur Zahlenreste
     const a = {
-      text: (m ? m[2] : ohneBullet).replace(/[+\-%\s]+$/, '').trim(),
-      wert: m ? m[1].replace(/\s+/g, '') : '',
-      gross: stern, implizit: false, verzaubert: false, schwach: false,
+      text, wert: m ? m[1].replace(/\s+/g, '').replace(/^×/, 'x') : '',
+      gross: !!l.stern, implizit: false, verzaubert: l.symbol === 'verzaubert', schwach: false,
       konfidenz: l.confidence, lang: ohneBullet.length > 70, roh: l.roh,
     };
     affixe.push(a);
@@ -801,6 +931,8 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
     }
   }
   if (affixe.some(a => a.gross)) hinweise.push('Stern-Symbol erkannt: diese Zeilen sind als „groß“ vorgemerkt – bitte prüfen.');
+  if (affixe.some(a => a.verzaubert)) hinweise.push('Blaues Verzauberungs-Symbol erkannt: diese Zeile ist als „verzaubert“ vorgemerkt – bitte prüfen.');
+  if (affixe.filter(a => a.verzaubert).length > 1) affixe.forEach(a => { a.verzaubert = false; });   // unmöglich → lieber nichts vormerken
 
   // Implizite Affixe bei Uniques vormarkieren (Hinweis aus katalog.json, keine Garantie)
   const u = findeUnique(katalog, item.name, item.slug);
@@ -836,6 +968,7 @@ if (typeof module !== 'undefined' && module.exports) {
     katalogListe, eintragZu, AKTION_MATERIAL, material, materialEintraege, farbeCss, pruefeIntegritaet,
     leeresItem, normalizeItem, normalizeInventar, bestandVon, engpassListe, istEngpass,
     reihenfolgeNotiz, STANDARD_REIHENFOLGE, KATEGORIE_LABEL, analysiereSlot, PRIO_RANG, TEXT,
-    slotVorschlag, parseTooltip, ocrZeile, aspektAusName, namenAbgleich, distanz,
+    slotVorschlag, parseTooltip, ocrZeile, aspektAusName, namenAbgleich, namenInText, distanz, itemTypAus,
+    affixVarianten, affixPasst, affixVergleichbar, affixAnzeige,
   };
 }
