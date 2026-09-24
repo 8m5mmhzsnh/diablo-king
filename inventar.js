@@ -256,6 +256,7 @@ function viewInvEditor() {
 
       <h3>Affixe <span class="small muted">– der unzuverlässigste Teil der Erkennung, bitte Zeile für Zeile prüfen</span></h3>
       ${ed.implizitHinweis ? `<div class="msg info small">${esc(ed.implizitHinweis)}</div>` : ''}
+      ${(ed.hinweise || []).map(h => `<div class="msg info small">${esc(h)}</div>`).join('')}
       <div class="affix-rows">
         ${d.affixe.map((a, i) => `<div class="affix-row${a.konfidenz != null && a.konfidenz < 60 ? ' unsicher' : ''}">
           <div class="affix-main">
@@ -270,7 +271,7 @@ function viewInvEditor() {
             <label><input type="checkbox" name="a.${i}.verzaubert" ${a.verzaubert ? 'checked' : ''}> verzaubert</label>
             <label><input type="checkbox" name="a.${i}.schwach" ${a.schwach ? 'checked' : ''}> Wert schwach</label>
             ${a.lang ? '<span class="small warn-text">lange Zeile – vermutlich Effekttext, kein Affix?</span>' : ''}
-            ${affixKatalogHinweis(a.text, i)}
+            ${a.korrigiertAus ? `<span class="small warn-text">aus „${esc(a.korrigiertAus)}“ korrigiert (Katalog)</span>` : affixKatalogHinweis(a.text, i)}
           </div>
         </div>`).join('') || '<p class="small muted">Keine Affixe.</p>'}
       </div>
@@ -356,6 +357,7 @@ function leseInvForm() {
   d.vermacht = fd.get('vermacht') === 'on';
   d.affixe = d.affixe.map((a, i) => ({
     ...a, text: g(`a.${i}.text`), wert: g(`a.${i}.wert`),
+    korrigiertAus: g(`a.${i}.text`) === a.text ? a.korrigiertAus : undefined,
     implizit: fd.get(`a.${i}.implizit`) === 'on', gross: fd.get(`a.${i}.gross`) === 'on',
     verzaubert: fd.get(`a.${i}.verzaubert`) === 'on', schwach: fd.get(`a.${i}.schwach`) === 'on',
   }));
@@ -430,13 +432,21 @@ async function holeWorker() {
       setOcrStatus(`${was} …${pct}`);
     },
   });
+  // Seitenlayout automatisch erkennen (PSM 3). Der Standard von Tesseract.js (ein einzelner Block)
+  // vermischt Item-Bild, Rahmen und Text und liefert bei D4-Tooltips deutlich schlechtere Zeilen.
+  await tessWorker.setParameters({ tessedit_pageseg_mode: '3', preserve_interword_spaces: '1' });
   return tessWorker;
 }
 
-/** Tooltip vorbereiten: vergrößern, Graustufen, bei dunklem Hintergrund invertieren. */
+/**
+ * Tooltip für die Texterkennung vorbereiten.
+ * D4-Tooltips haben hellen, farbigen Text (weiß, grau, orange, blau) auf dunklem, verlaufendem Grund.
+ * Pro Pixel zählt der hellste Farbkanal – so bleibt auch orangefarbener Text hell –, dann trennt ein
+ * Schwellwert nach Otsu Text und Hintergrund. Ergebnis: schwarzer Text auf weißem Grund.
+ */
 async function vorbereiten(blob) {
   const bmp = await createImageBitmap(blob);
-  const faktor = bmp.width < 1000 ? Math.min(3, 1400 / bmp.width) : 1;
+  const faktor = bmp.width < 1200 ? Math.min(3, 1600 / bmp.width) : 1;
   const c = document.createElement('canvas');
   c.width = Math.round(bmp.width * faktor);
   c.height = Math.round(bmp.height * faktor);
@@ -444,15 +454,31 @@ async function vorbereiten(blob) {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(bmp, 0, 0, c.width, c.height);
   const img = ctx.getImageData(0, 0, c.width, c.height);
-  const px = img.data;
-  let summe = 0;
-  for (let i = 0; i < px.length; i += 4) {
-    const g = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
-    px[i] = px[i + 1] = px[i + 2] = g;
-    summe += g;
+  const px = img.data, n = px.length / 4;
+  const hell = new Uint8Array(n), hist = new Array(256).fill(0);
+  for (let i = 0; i < n; i++) {
+    const v = Math.max(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
+    hell[i] = v; hist[v]++;
   }
-  const dunkel = summe / (px.length / 4) < 128;
-  if (dunkel) for (let i = 0; i < px.length; i += 4) px[i] = px[i + 1] = px[i + 2] = 255 - px[i];
+  // Otsu-Schwellwert
+  let summe = 0;
+  for (let t = 0; t < 256; t++) summe += t * hist[t];
+  let sB = 0, wB = 0, best = -1, schwelle = 128;
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t]; if (!wB) continue;
+    const wF = n - wB; if (!wF) break;
+    sB += t * hist[t];
+    const d = wB * wF * (sB / wB - (summe - sB) / wF) ** 2;
+    if (d > best) { best = d; schwelle = t; }
+  }
+  // Überwiegend heller Grund (z. B. Foto eines hellen Bildschirms)? Dann ist der Text dunkel.
+  let ueber = 0;
+  for (let i = 0; i < n; i++) if (hell[i] > schwelle) ueber++;
+  const textHell = ueber < n / 2;
+  for (let i = 0; i < n; i++) {
+    const istText = textHell ? hell[i] > schwelle : hell[i] <= schwelle;
+    px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = istText ? 0 : 255;
+  }
   ctx.putImageData(img, 0, 0);
   return c;
 }
@@ -463,6 +489,10 @@ async function starteOcr(blob, slotHint) {
   state.invEditor.draft.quelle = 'ocr';
   const ed = state.invEditor;
   try {
+    if (location.protocol === 'file:') {
+      throw new Error('Die App ist per Doppelklick geöffnet (file://). Dort verbieten Browser die Web-Worker, die die Texterkennung braucht. ' +
+        'Öffne sie über https://8m5mmhzsnh.github.io/diablo-king/ oder starte „start.bat“ im App-Ordner');
+    }
     const canvas = await vorbereiten(blob);
     const worker = await holeWorker();
     setOcrStatus('Erkenne Text …');
@@ -474,6 +504,7 @@ async function starteOcr(blob, slotHint) {
     ed.vorschlag = r.slot;
     ed.roh = r.roh;
     ed.implizitHinweis = r.implizitHinweis;
+    ed.hinweise = r.hinweise || [];
     ed.slot = slotHint || r.slot.key || '';
     ed.status = lines.length
       ? 'Erkannt – bitte jedes Feld prüfen und korrigieren, dann „Übernehmen“.'

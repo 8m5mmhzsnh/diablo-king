@@ -268,7 +268,7 @@ test('Tooltip-Parser: Name, Seltenheit, Typ, Macht, Affixe, Sockel, Härtung', (
   ];
   const katalog = { uniques: [{ slug: 'elegy', name_en: 'Elegy', itemTyp: 'Sword', num_inherents: 1 }] };
   const r = L.parseTooltip(lines, { wissen, katalog });
-  assert.equal(r.item.name, 'ELEGY');
+  assert.equal(r.item.name, 'Elegy', 'Unique-Name über den Katalog normalisiert');
   assert.equal(r.item.seltenheit, 'einzigartig');
   assert.equal(r.item.vermacht, true);
   assert.equal(r.item.itemTyp, 'Sword');
@@ -296,4 +296,56 @@ test('Tooltip-Parser: Unique ohne Katalog → nichts implizit, Hinweis', () => {
 test('Slot-Vorschlag: zweiter Ring geht auf Ring 2', () => {
   const s = L.slotVorschlag({ itemTyp: 'Ring', inventar: { ring1: { name: 'x' } } });
   assert.equal(s.key, 'ring2');
+});
+
+// Echte Tesseract-Ausgabe eines Spiel-Screenshots (Legendary Helm), inklusive der typischen Fehlglyphen.
+const echterHelm = [
+  [95, ''], [78, 'SADISTIC DOS'], [88, 'CASQUE'], [97, 'Legendary Helm'], [96, '850 Item Power'], [96, '1,275 Armor'],
+  [91, 'o +85 Willpower +[83 - 99]'], [86, '¢ +1,064 Maximum Life [1,016 - 1,225]'], [85, '¢ +943 Armor [780 - 980]'],
+  [90, 'o +2 to Sigil of Chaos [2 - 3]'], [93, '* Imprinted: When killing your'], [93, 'Demons, you have a 45% [30 - 50]%'],
+  [97, 'chance for each to count as two'], [96, 'kills. Your Life on Kill is increased'], [87, 'by 1%[+] of your Maximum Life.'],
+  [94, 'i Requires Level 70'], [70, 'j Account Bound'], [83, 'Lord of Hatred Item 1¥'], [71, 'Sell Value: 21,409 ®'],
+  [96, 'Durability: 30/100'], [97, 'Tempers: 3/3'], [34, 'AE TW WT TTL em TT WY,'],
+].map(([confidence, text]) => ({ confidence, text }));
+
+test('Echter Tooltip: Glyphen, Bereiche, Aspekt-Absatz und Fußzeilen werden richtig behandelt', () => {
+  const w = Object.assign({}, wissen, {
+    eintraege: [...wissen.eintraege, { name_de: 'Sadistischer Aspekt', name_en: 'Sadistic Aspect', typ: 'aspekt' }],
+  });
+  const katalog = { kategorien: {
+    affixe: { 'einträge': ['Willpower', 'Maximum Life', 'Armor', 'To Sigil of Chaos'].map(n => ({ name_en: n })) },
+    aspekte: { 'einträge': [{ name_en: 'Sadistic' }, { name_en: 'Doombringer' }] },
+  } };
+  const r = L.parseTooltip(echterHelm, { wissen: w, katalog });
+  assert.equal(r.item.seltenheit, 'legendär');
+  assert.equal(r.item.itemTyp, 'Helm');
+  assert.equal(r.item.gegenstandsmacht, 850);
+  assert.equal(r.item.aspekt, 'Sadistischer Aspekt (Sadistic Aspect)');
+  assert.deepEqual(r.item.affixe.map(a => [a.wert, a.text]), [
+    ['+85', 'Willpower'], ['+1,064', 'Maximum Life'], ['+943', 'Armor'], ['+2', 'To Sigil of Chaos'],
+  ]);
+  assert.deepEqual(r.item.haertungen, { genutzt: 3, max: 3, affix: '' });
+  assert.equal(r.slot.key, 'kopf');
+  // keine Glyphen im Ergebnis
+  const sichtbar = [r.item.name, r.item.aspekt, ...r.item.affixe.flatMap(a => [a.text, a.wert])].join(' ');
+  assert.doesNotMatch(sichtbar, /[©®¢¥\[\]]/);
+});
+
+test('OCR-Tippfehler im Affix werden über den Katalog korrigiert und markiert', () => {
+  const katalog = { kategorien: { affixe: { 'einträge': [{ name_en: 'Thorns' }, { name_en: 'Strength' }] } } };
+  const r = L.parseTooltip(['X', 'Rare Gloves', '800 Item Power', '+320 Thoms', '+95 Strenqth'], { wissen, katalog });
+  assert.deepEqual(r.item.affixe.map(a => [a.text, a.korrigiertAus]), [['Thorns', 'Thoms'], ['Strength', 'Strenqth']]);
+});
+
+test('Stern vor einem Affix → als groß vorgemerkt', () => {
+  const r = L.parseTooltip(['X', 'Legendary Ring', '800 Item Power', '* +12% Critical Strike Chance', 'o +5% Attack Speed'], { wissen });
+  assert.deepEqual(r.item.affixe.map(a => a.gross), [true, false]);
+});
+
+test('lib.js, app.js und inventar.js vertragen sich im selben globalen Scope (keine doppelten Namen)', () => {
+  const vm = require('node:vm');
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const quelle = ['lib.js', 'app.js', 'inventar.js'].map(f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8')).join('\n;\n');
+  assert.doesNotThrow(() => new vm.Script(quelle));
 });
