@@ -1,0 +1,14 @@
+{
+  "_info": "Diablo-4-Spickzettel. Aufbau siehe README.md. Leere Felder sind erlaubt. Verdikte: BEHALTEN, WÜRFELN, ZERLEGEN, VERWERTEN, VERKAUFEN.",
+  "version": 1,
+  "einstellungen": {
+    "warnTageBuildAlter": 14
+  },
+  "eintraege": [],
+  "rezepte": [],
+  "farmziele": [],
+  "sammelliste": [],
+  "builds": [],
+  "aktiverBuild": "",
+  "zielBuild": ""
+}

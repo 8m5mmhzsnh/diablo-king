@@ -1,0 +1,95 @@
+{
+  "_info": "FORMAT-BEISPIEL mit absichtlich erfundenen Platzhalter-Namen. Keine echten Spieldaten! Nur als Vorlage zum Abschreiben der Struktur in data.json.",
+  "version": 1,
+  "einstellungen": {
+    "warnTageBuildAlter": 14
+  },
+  "eintraege": [
+    {
+      "name_de": "Beispielhelm",
+      "name_en": "Example Helm",
+      "aliase": ["bsp helm"],
+      "typ": "unique",
+      "verdikt": "ZERLEGEN",
+      "begruendung": "Platzhalter: hier steht in einer Zeile, warum.",
+      "quelle": "Beispielboss",
+      "rezepte": ["bsp-rezept"],
+      "notiz": ""
+    },
+    {
+      "name_de": "Beispielrune",
+      "name_en": "Example Rune",
+      "aliase": [],
+      "typ": "rune",
+      "verdikt": "VERWERTEN",
+      "begruendung": "",
+      "quelle": "",
+      "rezepte": [],
+      "notiz": ""
+    },
+    {
+      "name_de": "Beispielsplitter",
+      "name_en": "Example Shard",
+      "aliase": [],
+      "typ": "material",
+      "verdikt": "",
+      "begruendung": "",
+      "quelle": "",
+      "rezepte": [],
+      "notiz": ""
+    }
+  ],
+  "rezepte": [
+    {
+      "id": "bsp-rezept",
+      "name_de": "Beispielrezept",
+      "name_en": "Example Recipe",
+      "input": [{ "name_de": "Beispielhelm", "name_en": "Example Helm", "menge": 1 }],
+      "kosten": [{ "name_de": "Beispielsplitter", "name_en": "Example Shard", "menge": 10 }],
+      "ergebnis": "Zufälliges Beispiel-Item (Random Example Item)",
+      "notiz": ""
+    }
+  ],
+  "farmziele": [
+    {
+      "quelle_de": "Beispielboss",
+      "quelle_en": "Example Boss",
+      "typ": "Boss",
+      "kosten": "",
+      "belohnungen": [
+        { "name_de": "Beispielhelm", "name_en": "Example Helm" },
+        "Beispielrune (Example Rune)"
+      ],
+      "notiz": ""
+    }
+  ],
+  "sammelliste": [
+    { "name_de": "Beispielsplitter", "name_en": "Example Shard", "notiz": "für Beispielrezept" }
+  ],
+  "builds": [
+    {
+      "id": "bsp-build",
+      "name": "Beispiel-Build",
+      "klasse": "",
+      "quelleUrl": "",
+      "datum": "2026-01-01",
+      "notiz": "",
+      "slots": {
+        "kopf": {
+          "zielItem": "Beispielhelm (Example Helm)",
+          "zielAspekt": "",
+          "sockel": "Beispielrune",
+          "affixe": ["Affix A", "Affix B"],
+          "haertung": "",
+          "quelle": "",
+          "erledigt": false
+        }
+      },
+      "wechselkriterien": [
+        { "text": "Beispielhelm vorhanden", "erledigt": false }
+      ]
+    }
+  ],
+  "aktiverBuild": "",
+  "zielBuild": "bsp-build"
+}
