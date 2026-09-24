@@ -494,3 +494,6 @@ label.drop { border-color: #5b4630; background: rgba(0, 0, 0, .35); border-radiu
 ol.route { margin: 2px 0 4px; padding-left: 20px; }
 details.analyse > summary { cursor: pointer; }
 details.mehr-hinweise > summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.item-effekt { color: var(--r-legendary); font-style: italic; font-size: 13px; margin: 4px 0; opacity: .9; }
+.truhe-drop { min-height: 90px; }
+.truhe-drop.aktiv, details.d4-slot.einfuege-ziel { outline: 2px solid var(--gold); outline-offset: 1px; }

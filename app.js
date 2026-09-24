@@ -8,6 +8,14 @@
    ================================================================ */
 
 const SCHEMA = 2;
+const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '?';
+
+/* Fehler sichtbar machen statt still zu scheitern (z. B. halb aktualisierte Dateien aus dem Browser-Cache) */
+window.addEventListener('error', e => {
+  const b = document.getElementById('banner');
+  if (b) b.insertAdjacentHTML('beforeend', `<div class="msg err">Fehler in der App (Version ${APP_VERSION}): ${String(e.message).replace(/[<>&]/g, '')}
+    – bitte die Seite neu laden (am PC Strg+F5). Bleibt der Fehler, schick mir diese Meldung.</div>`);
+});
 const FILES = {
   wissen: 'data/wissen.json',
   profil: 'data/profil.json',
@@ -273,6 +281,7 @@ async function loadUebersetzungen() {
   if (r.ok) lsSet(LS.uebersetzungen, u);
   state.uebersetzung = (u && u.affixe) || {};
   state.uebersetzungItemTypen = (u && u.itemTypen) || {};
+  state.uebersetzungDatei = u || {};
   state.uebersetzungQuelle = r.ok ? FILES.uebersetzungen : u ? 'Arbeitskopie im Browser' : `nicht geladen (${r.error})`;
 }
 function katalogZusammenfassung() {
@@ -653,7 +662,7 @@ function setTab(tab) {
 function renderHeader() {
   const w = state.wissen;
   const alt = istAlt(w.stand);
-  $('#wissen-meta').innerHTML = `Wissen v${esc(w.version ?? '?')}${w.season ? ` · S${esc(w.season)}` : ''} · Stand ${esc(w.stand || '?')}` +
+  $('#wissen-meta').innerHTML = `App v${esc(APP_VERSION)} · Wissen v${esc(w.version ?? '?')}${w.season ? ` · S${esc(w.season)}` : ''} · Stand ${esc(w.stand || '?')}` +
     (ageDays(w.stand) > 0 ? ` (vor ${ageDays(w.stand)} T.)` : '') + (alt ? ' ' + staleIcon(w.stand) : '');
   const ab = aktivBuild(), zb = zielBuild();
   $('#build-info').innerHTML =

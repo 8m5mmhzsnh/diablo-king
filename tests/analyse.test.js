@@ -576,3 +576,56 @@ test('Item prüfen: legendär, nicht im Build → Regel „nicht getragen“; ve
   assert.equal(L.bewerteItem({ item: it(), profil: profilFehlt(), wissen: w, katalog: katalogAffixe }).verdikt, 'ZERLEGEN');
   assert.equal(L.bewerteItem({ item: it({ vermacht: true }), profil: profilFehlt(), wissen: w, katalog: katalogAffixe }).verdikt, 'BEHALTEN');
 });
+
+test('index.html: alle Skripte und das Stylesheet tragen dieselbe Versionsnummer', () => {
+  const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'index.html'), 'utf8');
+  const meta = html.match(/name="app-version" content="([^"]+)"/)[1];
+  const versionen = [...html.matchAll(/(?:src|href)="[^"]+\?v=([^"]+)"/g)].map(m => m[1]);
+  assert.ok(versionen.length >= 5);
+  assert.ok(versionen.every(v => v === meta), `Versionen: ${versionen.join(', ')} / meta ${meta}`);
+});
+
+test('Echter Screenshot Moloch\'s (Unique): implizite Zeile, Unique-Kraft als Effekt, Sockel am Effekt erkannt', () => {
+  const r = L.parseTooltip(fixture('moloch'), { wissen: echtesWissen, katalog: echterKatalog, uebersetzung: require('../data/uebersetzungen.json') });
+  assert.equal(r.item.name, "Moloch's Beating Flame");
+  assert.equal(r.item.itemTyp, 'Amulet');
+  assert.deepEqual(r.item.affixe.map(a => [a.wert, a.text, a.implizit]), [
+    ['157', 'All Resist', true], ['+149', 'Willpower', false], ['+21%', 'Movement Speed', false],
+    ['4.7%', 'Resource Cost Reduction', false], ['+2', 'To Hellfire Skills', false],
+  ]);
+  assert.match(r.item.effekt, /^Hellfire Skills deal 30%.*Volatility/);
+  assert.equal(r.item.sockel.length, 1);
+  assert.equal(r.item.sockel[0].inhalt, 'Splitter der Mutter');
+  assert.match(r.item.sockel[0].effekt, /Unhindered/);
+  assert.doesNotMatch(r.item.effekt + r.item.sockel[0].effekt, /Therefore, behold/, 'Flavor-Text gehört nicht dazu');
+});
+
+test('Echter Screenshot Helm (2. Aufnahme): Aspekt-Effekt gespeichert, keine Sockel', () => {
+  const r = L.parseTooltip(fixture('helm2'), { wissen: echtesWissen, katalog: echterKatalog });
+  assert.equal(r.item.aspekt, 'Sadistischer Aspekt (Sadistic Aspect)');
+  assert.match(r.item.effekt, /^When killing your Demons, you have a 45%/);
+  assert.deepEqual(r.item.sockel, []);
+  assert.deepEqual(r.item.haertungen, { genutzt: 3, max: 3, affix: '' });
+  assert.ok(!r.item.affixe.some(a => a.implizit));
+});
+
+test('Unscharfer Unique-Name über Wörter: „Fmelech\'s Beating Flaie“ → Moloch\'s Beating Flame', () => {
+  assert.equal(L.namenWortAbgleich("Fmelech's Beating Flaie", ["Moloch's Beating Flame", 'Elegy']), "Moloch's Beating Flame");
+  const r = L.parseTooltip(["FMELECH'S BEATING FLAIE", 'Unique Amulet', '850 Item Power'], { wissen: echtesWissen, katalog: echterKatalog });
+  assert.equal(r.item.name, "Moloch's Beating Flame");
+});
+
+test('Rauschen vor dem Namen: „Lg Sadistic Doom Casque“ → Aspekt trotzdem erkannt', () => {
+  const r = L.parseTooltip(['Lg SADISTIC DOOM', 'CASQUE', 'Legendary Helm', '850 Item Power'], { wissen: echtesWissen, katalog: echterKatalog });
+  assert.equal(r.item.name, 'Sadistic Doom Casque');
+  assert.equal(r.item.aspekt, 'Sadistischer Aspekt (Sadistic Aspect)');
+});
+
+test('Unbekannter Sockelinhalt („?“) → keine Ersetzen-Empfehlung, sondern Hinweis; in „Was fehlt“ nicht als fehlend', () => {
+  const r = run(item({ sockel: [{ gefuellt: true, inhalt: '?', effekt: 'You are Unhindered' }] }));
+  assert.equal(kat(r, 'sockel').length, 0);
+  assert.ok(r.infos.some(i => /Inhalt nicht erkannt/.test(i.text)));
+  const p = profilFehlt({ inventar: { kopf: { name: "Leoric's Crown", seltenheit: 'einzigartig', sockel: [{ gefuellt: true, inhalt: '?' }] } } });
+  const f = L.wasFehlt({ profil: p, wissen: wissenFehlt, katalog: katalogAffixe });
+  assert.ok(!f.posten.some(x => x.art === 'sockel' && /Qual/.test(x.titel)));
+});
