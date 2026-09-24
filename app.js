@@ -1,18 +1,24 @@
 'use strict';
 
 /* ================================================================
-   D4 Spickzettel – alles in einer Datei, keine Abhängigkeiten.
-   Spieldaten: data/data.json   Fortschritt/Builds: localStorage
+   D4 Spickzettel – Schema 2
+   wissen.json  → Spielwissen, wird bei Updates komplett ersetzt
+   profil.json  → persönlich, wird nie überschrieben
+   Beides wird als Arbeitskopie im Browser (localStorage) gehalten.
    ================================================================ */
 
-const DATA_URL = 'data/data.json';
+const SCHEMA = 2;
+const FILES = {
+  wissen: 'data/wissen.json',
+  profil: 'data/profil.json',
+  profilLeer: 'data/profil-leer.json',
+};
 const LS = {
-  builds: 'd4k.builds',
-  aktiv: 'd4k.aktiv',
-  ziel: 'd4k.ziel',
-  sammeln: 'd4k.sammeln',
-  tab: 'd4k.tab',
-  dataCache: 'd4k.dataCache',
+  wissen: 'd4k2.wissen',            // Arbeitskopie wissen.json
+  wissenBasis: 'd4k2.wissenBasis',  // Fingerabdruck der Datei, auf der die Arbeitskopie beruht
+  wissenLokal: 'd4k2.wissenLokal',  // true, wenn in der App am Wissen etwas geändert wurde
+  profil: 'd4k2.profil',
+  altBuilds: 'd4k.builds', altAktiv: 'd4k.aktiv', altZiel: 'd4k.ziel',  // Schema 1
 };
 
 const SLOTS = [
@@ -29,22 +35,23 @@ const SLOTS = [
 ];
 const SLOT_BY_KEY = Object.fromEntries(SLOTS.map(s => [s.key, s]));
 
-const VERDIKTE = {
-  BEHALTEN: { label: 'BEHALTEN', cls: 'v-keep' },
-  WUERFELN: { label: 'WÜRFELN', cls: 'v-cube' },
-  ZERLEGEN: { label: 'ZERLEGEN', cls: 'v-salvage' },
-  VERWERTEN: { label: 'VERWERTEN', cls: 'v-use' },
-  VERKAUFEN: { label: 'VERKAUFEN', cls: 'v-sell' },
-  UNBEKANNT: { label: 'KEINE DATEN', cls: 'v-unknown' },
+
+const TRIFFT_LABEL = {
+  typ: 'Typ', seltenheit: 'Seltenheit', itemTyp: 'Item-Typ', getragen: 'getragen', set: 'Set',
+  setFremd: 'fremdes Set', duplikat: 'Duplikat', nichtImBuild: 'nicht im Build', plaetze: 'Plätze',
 };
 
-/* ---------------- Hilfsfunktionen ---------------- */
+const STALE_TIP = 'Daten könnten veraltet sein – im Spiel gegenprüfen';
+
+/* ================================================================
+   Hilfsfunktionen
+   ================================================================ */
 
 const $ = sel => document.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-/** Normalisiert für Vergleiche: klein, ohne Akzente/Umlaute-Punkte, nur a-z0-9 + Leerzeichen. */
+/** Normalisiert für Vergleiche: klein, ohne Akzente, nur a-z0-9 + Leerzeichen. */
 function norm(s) {
   return String(s ?? '')
     .toLowerCase()
@@ -53,6 +60,7 @@ function norm(s) {
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }
+const tokens = s => norm(s).split(' ').filter(Boolean);
 
 /** Enthält `hay` die Wortfolge `needle` (beides normalisiert)? */
 function hasWords(hay, needle) {
@@ -60,17 +68,43 @@ function hasWords(hay, needle) {
   return (' ' + hay + ' ').includes(' ' + needle + ' ');
 }
 
+/* Wortvergleich, der Endungen verzeiht: rune/runen, gelb/gelbe/gelben, selten/seltener, ring/rings. */
+const SUFFIXE = ['e', 'n', 'en', 'er', 'es', 'em', 'ern', 's', 'r'];
+function stems(w) {
+  const out = new Set([w]);
+  for (const s of SUFFIXE) if (w.endsWith(s) && w.length - s.length >= 3) out.add(w.slice(0, -s.length));
+  return out;
+}
+function wordEq(a, b) {
+  if (a === b) return true;
+  if (a.length < 3 || b.length < 3) return false;
+  const sb = stems(b);
+  for (const x of stems(a)) if (sb.has(x)) return true;
+  return false;
+}
+/** Gleiche Wortfolge mit toleranten Endungen: "gelbe runen" ≈ "gelbe rune". */
+function phraseEq(a, b) {
+  const ta = a.split(' '), tb = b.split(' ');
+  return ta.length === tb.length && ta.every((t, i) => wordEq(t, tb[i]));
+}
+/** Kommt die Wortfolge `needle` (tolerant) in `hay` vor? */
+function phraseIn(hay, needle) {
+  const th = hay.split(' '), tn = needle.split(' ');
+  for (let i = 0; i + tn.length <= th.length; i++) {
+    if (tn.every((t, j) => wordEq(th[i + j], t))) return true;
+  }
+  return false;
+}
+
 /** "Verwegenheit (Temerity)" – nur einmal, wenn gleich oder eins fehlt. */
 function bi(de, en) {
-  de = (de || '').trim(); en = (en || '').trim();
+  de = String(de || '').trim(); en = String(en || '').trim();
   if (de && en && norm(de) !== norm(en)) return `${de} (${en})`;
   return de || en;
 }
-
-/** Name eines Listeneintrags, der String oder {name_de,name_en,menge} sein darf. */
 function itemText(x) {
   if (x == null) return '';
-  if (typeof x === 'string') return x;
+  if (typeof x !== 'object') return String(x);
   const n = bi(x.name_de || x.name, x.name_en);
   return x.menge != null && x.menge !== '' ? `${x.menge}× ${n}` : n;
 }
@@ -79,25 +113,7 @@ function listText(x) {
   if (Array.isArray(x)) return x.map(itemText).filter(Boolean).join(', ');
   return itemText(x);
 }
-function asArray(x) {
-  if (x == null || x === '') return [];
-  return Array.isArray(x) ? x : [x];
-}
-
-function verdiktKey(v) {
-  const n = norm(v).replace(/ /g, '');
-  if (!n) return '';
-  if (n.startsWith('behalt') || n === 'keep') return 'BEHALTEN';
-  if (n.startsWith('wurfel') || n.startsWith('wuerfel') || n === 'cube') return 'WUERFELN';
-  if (n.startsWith('zerleg') || n === 'salvage') return 'ZERLEGEN';
-  if (n.startsWith('verwert') || n === 'use') return 'VERWERTEN';
-  if (n.startsWith('verkauf') || n === 'sell') return 'VERKAUFEN';
-  return '';
-}
-function verdiktHtml(key, big) {
-  const v = VERDIKTE[key] || VERDIKTE.UNBEKANNT;
-  return `<span class="verdikt ${v.cls}${big ? ' big' : ''}">${v.label}</span>`;
-}
+const asArray = x => (x == null || x === '' ? [] : Array.isArray(x) ? x : [x]);
 
 function lsGet(key, fallback) {
   try {
@@ -108,6 +124,7 @@ function lsGet(key, fallback) {
 function lsSet(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.warn('localStorage', e); }
 }
+function lsDel(key) { try { localStorage.removeItem(key); } catch { /* egal */ } }
 
 function today() {
   const d = new Date();
@@ -119,44 +136,82 @@ function ageDays(datum) {
   if (isNaN(t)) return null;
   return Math.floor((Date.now() - t) / 86400000);
 }
-function safeUrl(u) {
-  return /^https?:\/\//i.test(u || '') ? u : '';
-}
-function newId() {
-  return 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const safeUrl = u => (/^https?:\/\//i.test(u || '') ? u : '');
+const newId = () => 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+function hashText(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return String(h >>> 0);
 }
 
-/* ---------------- Zustand ---------------- */
+function download(name, obj) {
+  const blob = new Blob([JSON.stringify(obj, null, 2) + '\n'], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
 
-const EMPTY_DATA = {
-  einstellungen: { warnTageBuildAlter: 14 },
-  eintraege: [], rezepte: [], farmziele: [], sammelliste: [], builds: [],
-  aktiverBuild: '', zielBuild: '',
-};
+/* ================================================================
+   Zustand
+   ================================================================ */
 
 const state = {
-  data: structuredClone(EMPTY_DATA),
-  dataSource: '',      // 'datei' | 'cache' | 'leer'
-  dataError: '',
-  builds: [],
-  aktivId: '',
-  zielId: '',
-  sammelDone: {},      // norm(name) -> true
+  wissen: null,
+  profil: null,
+  meldungen: [],          // { art: 'warn'|'err'|'info', text, aktion? }
+  wissenQuelle: '',       // Beschreibung, woher das Wissen kommt
+  profilQuelle: '',
+  neueWissenDatei: null,  // { data, hash } wenn eine neuere Datei bereitliegt, aber lokale Änderungen existieren
   tab: 'suche',
   query: '',
-  editor: null,        // { draft, isNew, unassigned: [] }
+  editor: null,           // Build-Editor
   importOpen: false,
-  zielViewId: '',
+  eintragEditor: null,    // { index, draft }
+  dateienOpen: false,
 };
 
-function normalizeData(d) {
-  const out = Object.assign(structuredClone(EMPTY_DATA), d || {});
-  for (const k of ['eintraege', 'rezepte', 'farmziele', 'sammelliste', 'builds']) {
-    if (!Array.isArray(out[k])) out[k] = [];
+function warnTage() {
+  const n = Number(state.profil?.einstellungen?.warnTageBuildAlter);
+  return Number.isFinite(n) && n > 0 ? n : 14;
+}
+const istAlt = stand => { const a = ageDays(stand); return a != null && a > warnTage(); };
+
+function staleIcon(stand) {
+  if (!istAlt(stand)) return '';
+  const tip = `${STALE_TIP} (Stand ${stand}, vor ${ageDays(stand)} Tagen)`;
+  return `<span class="stale" tabindex="0" title="${esc(tip)}" data-tip="${esc(tip)}">⚠</span>`;
+}
+
+/* ---------- Normalisierung ---------- */
+
+function normalizeWissen(w) {
+  w = Object.assign({}, w || {});
+  for (const k of ['eintraege', 'regeln', 'rezepte', 'farmziele', 'notizen', 'verdikte', 'quellen']) {
+    if (!Array.isArray(w[k])) w[k] = [];
   }
-  out.einstellungen = Object.assign({ warnTageBuildAlter: 14 }, out.einstellungen || {});
-  out.builds = out.builds.map(normalizeBuild);
-  return out;
+  // seltenheitSynonyme: Liste von {id, name_de, name_en, synonyme[]} – oder Objekt {id: [synonyme]} / {synonym: id}
+  let s = w.seltenheitSynonyme;
+  if (s && !Array.isArray(s) && typeof s === 'object') {
+    const map = new Map();
+    for (const [k, v] of Object.entries(s)) {
+      if (Array.isArray(v)) map.set(k, { id: k, synonyme: v });
+      else if (typeof v === 'string') {
+        if (!map.has(v)) map.set(v, { id: v, synonyme: [] });
+        map.get(v).synonyme.push(k);
+      }
+    }
+    s = [...map.values()];
+  }
+  w.seltenheitSynonyme = asArray(s).filter(x => x && x.id).map(x => ({
+    id: x.id, name_de: x.name_de || x.id, name_en: x.name_en || '', synonyme: asArray(x.synonyme),
+  }));
+  w.regeln = w.regeln.map((r, i) => Object.assign({ id: `regel-${i + 1}`, trifft: {}, suchbegriffe: [], ausnahmen: [] }, r));
+  return w;
 }
 
 function emptySlot() {
@@ -167,156 +222,395 @@ function normalizeBuild(b) {
   if (!b.id) b.id = newId();
   const slots = {};
   for (const s of SLOTS) {
-    const src = (b.slots && b.slots[s.key]) || {};
-    const slot = Object.assign(emptySlot(), src);
+    const slot = Object.assign(emptySlot(), (b.slots && b.slots[s.key]) || {});
     if (typeof slot.affixe === 'string') slot.affixe = slot.affixe.split(/\n|,/).map(x => x.trim()).filter(Boolean);
     if (!Array.isArray(slot.affixe)) slot.affixe = [];
     slot.erledigt = !!slot.erledigt;
     slots[s.key] = slot;
   }
   b.slots = slots;
-  b.wechselkriterien = asArray(b.wechselkriterien).map(w =>
-    typeof w === 'string' ? { text: w, erledigt: false } : { text: w.text || '', erledigt: !!w.erledigt })
+  b.wechselkriterien = asArray(b.wechselkriterien)
+    .map(w => (typeof w === 'string' ? { text: w, erledigt: false } : { text: w.text || '', erledigt: !!w.erledigt }))
     .filter(w => w.text);
   return b;
 }
-
-function saveBuilds() {
-  lsSet(LS.builds, state.builds);
-  lsSet(LS.aktiv, state.aktivId);
-  lsSet(LS.ziel, state.zielId);
+function normalizeProfil(p) {
+  p = Object.assign({}, p || {});
+  if (!p.charakter || typeof p.charakter !== 'object') p.charakter = {};
+  p.einstellungen = Object.assign({ warnTageBuildAlter: 14 }, p.einstellungen || {});
+  for (const k of ['builds', 'sammelliste', 'offeneAufgaben', 'abweichungen']) if (!Array.isArray(p[k])) p[k] = [];
+  p.builds = p.builds.map(normalizeBuild);
+  p.sammelliste = p.sammelliste.map(x => (typeof x === 'string' ? { name_de: x, name_en: '', notiz: '', erledigt: false } : x));
+  p.offeneAufgaben = p.offeneAufgaben.map(x => (typeof x === 'string' ? { text: x, erledigt: false } : x));
+  if (!p.builds.some(b => b.id === p.aktiverBuild)) p.aktiverBuild = '';
+  if (!p.builds.some(b => b.id === p.zielBuild)) p.zielBuild = '';
+  return p;
 }
-const buildById = id => state.builds.find(b => b.id === id) || null;
-const aktivBuild = () => buildById(state.aktivId);
-const zielBuild = () => buildById(state.zielId);
 
-async function loadData() {
-  let loaded = null;
+/* ---------- Laden ---------- */
+
+async function fetchJson(url) {
   try {
-    const res = await fetch(DATA_URL, { cache: 'no-store' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    loaded = await res.json();
-    state.dataSource = 'datei';
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return { ok: false, fehlt: res.status === 404, error: 'HTTP ' + res.status };
+    const text = await res.text();
+    try { return { ok: true, data: JSON.parse(text), hash: hashText(text) }; }
+    catch (e) { return { ok: false, kaputt: true, error: 'kein gültiges JSON: ' + e.message }; }
   } catch (e) {
-    if (e instanceof SyntaxError) {
-      state.dataSource = 'leer';
-      state.dataError = `data.json ist kein gültiges JSON: ${e.message}`;
-      applyData(null);
-      return;
-    }
-    const cached = lsGet(LS.dataCache, null);
-    if (cached && cached.data) {
-      loaded = cached.data;
-      state.dataSource = 'cache';
-      state.dataError = `data.json konnte nicht direkt gelesen werden (${e.message}). Verwende die zuletzt manuell geladene Version vom ${new Date(cached.zeit).toLocaleString('de-DE')}.`;
-    } else {
-      state.dataSource = 'leer';
-      state.dataError = `data.json konnte nicht gelesen werden (${e.message}). Beim Öffnen per Doppelklick (file://) blockiert der Browser das. Lade die Datei einmal unter „Daten“ von Hand oder starte einen lokalen Webserver (siehe README).`;
-    }
+    return { ok: false, error: e.message };
   }
-  applyData(loaded);
 }
 
-function applyData(raw) {
-  state.data = normalizeData(raw);
-  const storedBuilds = lsGet(LS.builds, null);
-  if (Array.isArray(storedBuilds)) {
-    state.builds = storedBuilds.map(normalizeBuild);
-    state.aktivId = lsGet(LS.aktiv, '');
-    state.zielId = lsGet(LS.ziel, '');
-  } else {
-    state.builds = structuredClone(state.data.builds);
-    state.aktivId = state.data.aktiverBuild || '';
-    state.zielId = state.data.zielBuild || '';
-  }
-  if (!buildById(state.aktivId)) state.aktivId = '';
-  if (!buildById(state.zielId)) state.zielId = '';
-  state.sammelDone = lsGet(LS.sammeln, {}) || {};
+function saveWissen(lokalGeaendert) {
+  lsSet(LS.wissen, state.wissen);
+  if (lokalGeaendert) lsSet(LS.wissenLokal, true);
   buildIndex();
 }
+function saveProfil() { lsSet(LS.profil, state.profil); }
+const wissenLokal = () => !!lsGet(LS.wissenLokal, false);
 
-/* ---------------- Suchindex & Bewertung ---------------- */
+async function loadWissen() {
+  const lokal = lsGet(LS.wissen, null);
+  const basis = lsGet(LS.wissenBasis, '');
+  const datei = await fetchJson(FILES.wissen);
+
+  if (datei.ok) {
+    if (!lokal) {
+      state.wissen = datei.data;
+      lsSet(LS.wissen, datei.data); lsSet(LS.wissenBasis, datei.hash); lsDel(LS.wissenLokal);
+      state.wissenQuelle = FILES.wissen;
+    } else if (datei.hash === basis) {
+      state.wissen = lokal;
+      state.wissenQuelle = wissenLokal() ? `${FILES.wissen} + Änderungen in der App` : FILES.wissen;
+    } else if (!wissenLokal()) {
+      state.wissen = datei.data;
+      lsSet(LS.wissen, datei.data); lsSet(LS.wissenBasis, datei.hash);
+      state.wissenQuelle = FILES.wissen;
+      if (basis) state.meldungen.push({ art: 'info', text: `Wissen aktualisiert auf Version ${datei.data.version || '?'} (Stand ${datei.data.stand || '?'}).` });
+    } else {
+      state.wissen = lokal;
+      state.wissenQuelle = 'Arbeitskopie mit Änderungen in der App';
+      state.neueWissenDatei = datei;
+      state.meldungen.push({
+        art: 'warn',
+        text: `Neue wissen.json liegt bereit (Version ${datei.data.version || '?'}, Stand ${datei.data.stand || '?'}). Du hast das Wissen in der App geändert – beim Übernehmen gehen diese Änderungen verloren. Vorher unter „Dateien“ exportieren.`,
+        aktion: { act: 'wissen-uebernehmen', label: 'Neue Datei übernehmen' },
+      });
+    }
+  } else if (lokal) {
+    state.wissen = lokal;
+    state.wissenQuelle = 'Arbeitskopie im Browser';
+    if (datei.kaputt) state.meldungen.push({ art: 'err', text: `wissen.json ist ${datei.error}. Verwende die letzte funktionierende Version.` });
+  } else {
+    state.wissen = {};
+    state.wissenQuelle = 'nichts geladen';
+    state.meldungen.push({
+      art: 'err',
+      text: datei.kaputt
+        ? `wissen.json ist ${datei.error}.`
+        : `wissen.json konnte nicht gelesen werden (${datei.error}). Beim Öffnen per Doppelklick (file://) blockiert der Browser das – unter „Dateien“ von Hand laden oder einen lokalen Webserver starten (siehe README).`,
+    });
+  }
+  state.wissen = normalizeWissen(state.wissen);
+}
+
+async function loadProfil() {
+  const lokal = lsGet(LS.profil, null);
+  if (lokal) {
+    state.profil = normalizeProfil(lokal);
+    state.profilQuelle = 'Browser (localStorage)';
+    return;
+  }
+  // Erster Start: profil.json → sonst profil-leer.json → sonst leeres Profil
+  let src = await fetchJson(FILES.profil);
+  state.profilQuelle = FILES.profil;
+  if (!src.ok) {
+    src = await fetchJson(FILES.profilLeer);
+    state.profilQuelle = `neu aus ${FILES.profilLeer}`;
+  }
+  let p = src.ok ? src.data : { schemaVersion: SCHEMA };
+  if (!src.ok) state.profilQuelle = 'neues leeres Profil';
+
+  // Builds aus Schema 1 (alte Version der App) übernehmen, wenn vorhanden
+  const alt = lsGet(LS.altBuilds, null);
+  if (Array.isArray(alt) && alt.length) {
+    p = Object.assign({}, p, {
+      builds: alt,
+      aktiverBuild: lsGet(LS.altAktiv, '') || '',
+      zielBuild: lsGet(LS.altZiel, '') || '',
+    });
+    state.meldungen.push({ art: 'info', text: `${alt.length} Build(s) aus der alten App-Version ins Profil übernommen.` });
+  }
+  state.profil = normalizeProfil(p);
+  saveProfil();
+}
+
+function pruefeSchema() {
+  if (state.wissenQuelle === 'nichts geladen') return;   // dazu gibt es schon eine Meldung
+  const ws = state.wissen.schemaVersion, ps = state.profil.schemaVersion;
+  const probleme = [];
+  if (ws !== SCHEMA) probleme.push(`wissen.json hat schemaVersion ${ws ?? 'fehlt'}`);
+  if (ps !== SCHEMA) probleme.push(`profil.json hat schemaVersion ${ps ?? 'fehlt'}`);
+  if (probleme.length || ws !== ps) {
+    state.meldungen.push({
+      art: 'warn',
+      text: `Schema passt nicht zusammen: ${probleme.join(', ') || `wissen ${ws} ≠ profil ${ps}`}. Die App erwartet ${SCHEMA}. Es wird angezeigt, was lesbar ist – Ergebnisse können unvollständig sein.`,
+    });
+  }
+}
+
+/* ================================================================
+   Wissen-Zugriff
+   ================================================================ */
+
+const buildById = id => state.profil.builds.find(b => b.id === id) || null;
+const aktivBuild = () => buildById(state.profil.aktiverBuild);
+const zielBuild = () => buildById(state.profil.zielBuild);
+
+function verdiktInfo(id) {
+  const n = norm(id);
+  if (!n) return null;
+  const v = state.wissen.verdikte.find(x => norm(x.id) === n);
+  return v ? { id: v.id, farbe: v.farbe, text: v.text || '' } : { id: String(id).toUpperCase(), farbe: '', text: 'Nicht in wissen.json → verdikte' };
+}
+function safeColor(c) {
+  return /^(#[0-9a-f]{3,8}|[a-z]{3,20}|rgba?\([\d\s.,%]+\)|hsla?\([\d\s.,%deg]+\))$/i.test(c || '') ? c : '';
+}
+function textColorFor(c) {
+  const m = /^#([0-9a-f]{6})/i.exec(c || '') || /^#([0-9a-f]{3})$/i.exec(c || '');
+  if (!m) return '#fff';
+  let hex = m[1];
+  if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16));
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 160 ? '#1a120b' : '#fff';
+}
+function verdiktHtml(id, big) {
+  const v = verdiktInfo(id);
+  if (!v) return `<span class="verdikt v-none${big ? ' big' : ''}">KEIN VERDIKT</span>`;
+  const bg = safeColor(v.farbe) || '#5c5249';
+  return `<span class="verdikt${big ? ' big' : ''}" style="background:${bg};color:${textColorFor(bg)}" title="${esc(v.text)}">${esc(v.id)}</span>`;
+}
+const istVerdikt = (a, b) => norm(a) === norm(b);
+
+/* ---------- Seltenheit ---------- */
+
+function seltenheitAus(token) {
+  for (const s of state.wissen.seltenheitSynonyme) {
+    for (const syn of [s.id, ...s.synonyme]) {
+      const n = norm(syn);
+      if (n && !n.includes(' ') && wordEq(token, n)) return s.id;
+    }
+  }
+  return '';
+}
+function seltenheitKanon(wert) {
+  const n = norm(wert);
+  if (!n) return '';
+  for (const s of state.wissen.seltenheitSynonyme) {
+    if ([s.id, s.name_de, s.name_en, ...s.synonyme].some(x => norm(x) === n)) return s.id;
+  }
+  return seltenheitAus(n) || wert;
+}
+function seltenheitAnzeige(id) {
+  const s = state.wissen.seltenheitSynonyme.find(x => x.id === id);
+  return s ? bi(s.name_de, s.name_en) : id;
+}
+
+/** Zerlegt eine Suche in Seltenheiten und restliche Wörter. */
+function analysiere(q) {
+  let rest = q.split(' ').filter(Boolean);
+  const selt = new Set();
+  // mehrwortige Synonyme zuerst
+  for (const s of state.wissen.seltenheitSynonyme) {
+    for (const syn of s.synonyme) {
+      const n = norm(syn);
+      if (n.includes(' ') && hasWords(rest.join(' '), n)) {
+        selt.add(s.id);
+        rest = (' ' + rest.join(' ') + ' ').replace(' ' + n + ' ', ' ').trim().split(' ').filter(Boolean);
+      }
+    }
+  }
+  rest = rest.filter(t => { const id = seltenheitAus(t); if (id) { selt.add(id); return false; } return true; });
+  const typWerte = alleTypWerte();
+  const typErkannt = rest.some(t => typWerte.some(v => wordEq(t, v)));
+  return { q, selt, rest, typErkannt };
+}
+
+let TYPWERTE_CACHE = null;
+function alleTypWerte() {
+  if (TYPWERTE_CACHE) return TYPWERTE_CACHE;
+  const set = new Set();
+  const add = x => asArray(x).forEach(v => tokens(v).forEach(t => t !== '*' && set.add(t)));
+  state.wissen.regeln.forEach(r => { add(r.trifft?.typ); add(r.trifft?.itemTyp); });
+  state.wissen.eintraege.forEach(e => { add(e.typ); add(e.itemTyp); });
+  TYPWERTE_CACHE = [...set];
+  return TYPWERTE_CACHE;
+}
+
+/* ---------- Quellen ---------- */
+
+function quelleText(q) {
+  if (!q) return '';
+  if (typeof q === 'object') return bi(q.name_de || q.name, q.name_en);
+  const n = norm(q);
+  const src = state.wissen.quellen.find(x => norm(x.id) === n || norm(x.name_de) === n || norm(x.name_en) === n);
+  if (!src) return String(q);
+  const t = bi(src.name_de || src.name, src.name_en) || src.id;
+  return src.typ ? `${t} [${src.typ}]` : t;
+}
+function farmQuelle(f) {
+  const q = f.quelle ? quelleText(f.quelle) : bi(f.quelle_de, f.quelle_en);
+  return f.typ && q && !q.includes('[') ? `${q} [${f.typ}]` : q;
+}
+
+/* ================================================================
+   Suchindex
+   ================================================================ */
 
 let INDEX = [];
 
 function entryKeys(e) {
   return [e.name_de, e.name_en, e.name, ...asArray(e.aliase)].map(norm).filter(Boolean);
 }
-
-/** Zerlegt Freitext (z. B. Sockel "Rune A + Rune B") in Einzelteile. */
 function splitParts(text) {
   return String(text || '').split(/[,+;\/&\n]| und | and /i).map(x => x.trim()).filter(Boolean);
 }
 
 function buildIndex() {
-  const d = state.data;
-  INDEX = d.eintraege.map((e, i) => ({
-    id: 'e' + i, src: e, pseudo: false,
-    anzeige: bi(e.name_de || e.name, e.name_en),
-    typ: e.typ || '',
-    keys: entryKeys(e),
+  TYPWERTE_CACHE = null;
+  const w = state.wissen;
+  INDEX = w.eintraege.map((e, i) => ({
+    kind: 'eintrag', index: i, src: e,
+    anzeige: bi(e.name_de || e.name, e.name_en), keys: entryKeys(e),
   })).filter(x => x.keys.length);
 
-  // Namen, die nur in Builds/Listen vorkommen, trotzdem findbar machen.
-  const known = x => INDEX.some(e => e.keys.some(k => hasWords(x, k)));
-  const addPseudo = (text, typ) => {
+  // Namen, die nur in Builds, Listen oder als Regel-Ausnahme vorkommen, trotzdem findbar machen
+  const known = n => INDEX.some(e => e.keys.some(k => hasWords(n, k)));
+  const addName = (text, herkunft) => {
+    text = String(text || '').trim();
     const n = norm(text);
-    if (!n || known(n)) return;
-    INDEX.push({ id: 'p' + INDEX.length, src: {}, pseudo: true, anzeige: text.trim(), typ, keys: [n] });
+    if (!n) return;
+    const vorhanden = INDEX.find(e => e.kind === 'name' && e.keys[0] === n);
+    if (vorhanden) { if (!vorhanden.herkunft.includes(herkunft)) vorhanden.herkunft.push(herkunft); return; }
+    if (known(n)) return;
+    INDEX.push({ kind: 'name', src: {}, anzeige: text, keys: [n], herkunft: [herkunft] });
   };
-  for (const b of state.builds) {
+  for (const b of state.profil.builds) {
     for (const s of SLOTS) {
       const sl = b.slots[s.key];
-      addPseudo(sl.zielItem, 'aus Build');
-      addPseudo(sl.zielAspekt, 'Aspekt aus Build');
-      splitParts(sl.sockel).forEach(p => addPseudo(p, 'Sockel aus Build'));
+      addName(sl.zielItem, 'Build');
+      addName(sl.zielAspekt, 'Build');
+      splitParts(sl.sockel).forEach(p => addName(p, 'Build'));
     }
   }
-  d.sammelliste.forEach(x => addPseudo(itemText(x), 'Sammelliste'));
-  d.farmziele.forEach(f => asArray(f.belohnungen).forEach(x => addPseudo(itemText(x), 'Farm-Belohnung')));
-  d.rezepte.forEach(r => asArray(r.ergebnis).forEach(x => addPseudo(itemText(x), 'Würfel-Ergebnis')));
+  state.profil.sammelliste.forEach(x => addName(itemText(x), 'Sammelliste'));
+  w.farmziele.forEach(f => asArray(f.belohnungen).forEach(x => addName(itemText(x), 'Farm-Belohnung')));
+  w.rezepte.forEach(r => asArray(r.ergebnis).forEach(x => addName(itemText(x), 'Würfel-Ergebnis')));
+  w.regeln.forEach(r => asArray(r.ausnahmen).forEach(x => addName(itemText(x), 'Regel-Ausnahme')));
 }
 
-function score(keys, q, qTokens) {
+function nameScore(keys, q, qTokens) {
   let best = 0;
   for (const k of keys) {
     if (k === q) return 100;
-    if (k.startsWith(q)) best = Math.max(best, 85);
-    else if (hasWords(k, q)) best = Math.max(best, 75);
-    else if (k.includes(q)) best = Math.max(best, 55);
-    else if (qTokens.length > 1 && qTokens.every(t => k.includes(t))) best = Math.max(best, 40);
+    if (phraseEq(k, q)) best = Math.max(best, 95);
+    else if (k.startsWith(q)) best = Math.max(best, 85);
+    else if (hasWords(k, q) || phraseIn(k, q)) best = Math.max(best, 75);
+    else if (q.length >= 3 && k.includes(q)) best = Math.max(best, 55);
+    else if (qTokens.length > 1 && qTokens.every(t => k.split(' ').some(kt => wordEq(kt, t) || (t.length >= 3 && kt.startsWith(t))))) best = Math.max(best, 45);
   }
   return best;
 }
 
-function search(query) {
-  const q = norm(query);
-  if (!q) return [];
-  const tokens = q.split(' ');
-  return INDEX
-    .map(e => ({ e, s: score(e.keys, q, tokens) }))
-    .filter(x => x.s > 0)
-    .sort((a, b) => b.s - a.s || a.e.anzeige.localeCompare(b.e.anzeige, 'de'))
-    .slice(0, 20)
-    .map(x => x.e);
+/* ---------- Regeln ---------- */
+
+const istFallback = r => asArray(r.trifft?.typ).some(t => String(t).trim() === '*');
+
+function trifftScore(r, qa) {
+  const t = r.trifft || {};
+  const typVals = [...asArray(t.typ), ...asArray(t.itemTyp)].filter(v => String(v).trim() !== '*');
+  if (!typVals.length) return 0;
+  const typTokens = typVals.flatMap(tokens);
+  if (!qa.rest.some(tok => typTokens.some(v => wordEq(tok, v)))) return 0;
+  const sel = asArray(t.seltenheit).map(seltenheitKanon);
+  if (qa.selt.size) {
+    if (!sel.length) return 65;
+    return [...qa.selt].every(s => sel.includes(s)) ? 85 : 0;
+  }
+  return sel.length ? 60 : 70;
 }
 
-const SLOT_FELDER = [
-  ['zielItem', 'Ziel-Item'],
-  ['zielAspekt', 'Aspekt'],
-  ['sockel', 'Sockel'],
-];
+function suchbegriffScore(r, q) {
+  let best = 0;
+  for (const sb of asArray(r.suchbegriffe)) {
+    const n = norm(sb);
+    if (!n) continue;
+    if (n === q) return 100;
+    if (phraseEq(n, q)) best = Math.max(best, 95);
+    else if (phraseIn(q, n) || phraseIn(n, q)) best = Math.max(best, 70);
+  }
+  return best;
+}
 
-/** Wo braucht Build `b` einen der Namen `keys`? */
+function regelnFuerSuche(qa) {
+  const hits = [];
+  for (const r of state.wissen.regeln) {
+    if (istFallback(r)) continue;
+    const s = Math.max(suchbegriffScore(r, qa.q), trifftScore(r, qa));
+    if (s > 0) hits.push({ r, s });
+  }
+  if (!hits.length && (qa.selt.size || qa.typErkannt)) {
+    for (const r of state.wissen.regeln) {
+      if (!istFallback(r)) continue;
+      const sel = asArray(r.trifft?.seltenheit).map(seltenheitKanon);
+      if (sel.length && !(qa.selt.size && [...qa.selt].every(s => sel.includes(s)))) continue;
+      hits.push({ r, s: 30, fallback: true });
+    }
+  }
+  return hits.sort((a, b) => b.s - a.s);
+}
+
+/** Ist ein Name eine Ausnahme dieser Regel? */
+function istAusnahme(r, keys) {
+  return asArray(r.ausnahmen).some(a => { const n = norm(itemText(a)); return keys.some(k => k === n || phraseEq(k, n)); });
+}
+
+/** Regel für einen benannten Eintrag ohne eigenes Verdikt – über typ/itemTyp/seltenheit. */
+function regelFuerEintrag(e, imBuild) {
+  const keys = entryKeys(e);
+  const typT = [...asArray(e.typ), ...asArray(e.itemTyp)].flatMap(tokens);
+  const selt = seltenheitKanon(e.seltenheit);
+  const passt = r => {
+    const t = r.trifft || {};
+    if (t.nichtImBuild === true && imBuild) return false;
+    if (istAusnahme(r, keys)) return false;
+    const sel = asArray(t.seltenheit).map(seltenheitKanon);
+    if (sel.length && !sel.includes(selt)) return false;
+    return true;
+  };
+  for (const r of state.wissen.regeln) {
+    if (istFallback(r) || !passt(r)) continue;
+    const vals = [...asArray(r.trifft?.typ), ...asArray(r.trifft?.itemTyp)].flatMap(tokens);
+    if (vals.length && typT.some(t => vals.some(v => wordEq(t, v)))) return r;
+  }
+  return state.wissen.regeln.find(r => istFallback(r) && passt(r)) || null;
+}
+
+/* ================================================================
+   Bewertung
+   ================================================================ */
+
+const SLOT_FELDER = [['zielItem', 'Ziel-Item'], ['zielAspekt', 'Aspekt'], ['sockel', 'Sockel']];
+
 function buildRefs(b, keys) {
-  if (!b) return [];
+  if (!b || !keys.length) return [];
   const refs = [];
   for (const s of SLOTS) {
     const sl = b.slots[s.key];
     for (const [feld, label] of SLOT_FELDER) {
       const parts = feld === 'sockel' ? splitParts(sl[feld]) : [sl[feld]];
-      if (parts.some(p => { const n = norm(p); return keys.some(k => hasWords(n, k)); })) {
-        refs.push({ slot: s, feld: label, erledigt: sl.erledigt });
+      if (parts.some(p => { const n = norm(p); return n && keys.some(k => hasWords(n, k)); })) {
+        refs.push({ slot: s, feld: label });
       }
     }
   }
@@ -324,207 +618,356 @@ function buildRefs(b, keys) {
 }
 const refText = refs => refs.map(r => `${r.slot.de} (${r.feld})`).join(', ');
 
-function bewerten(entry) {
-  const keys = entry.keys;
+function buildBezug(keys) {
   const ab = aktivBuild(), zb = zielBuild();
-  const aRefs = buildRefs(ab, keys);
-  const zRefs = buildRefs(zb, keys);
-  const inA = aRefs.length > 0, inZ = zRefs.length > 0;
-
-  const zuordnung = inA && inZ ? 'beides' : inA ? 'aktueller Build' : inZ ? 'späterer Build' : 'keiner';
-
-  const sammel = state.data.sammelliste.find(x => {
-    const n = norm(itemText(typeof x === 'string' ? x : { name_de: x.name_de || x.name, name_en: x.name_en }));
-    return keys.some(k => hasWords(n, k));
-  });
-
-  const dbV = verdiktKey(entry.src.verdikt);
-  const dbGrund = entry.src.begruendung || '';
-  let verdikt, grund, hinweis = '';
-
-  if (inA || inZ) {
-    verdikt = 'BEHALTEN';
-    if (inA && inZ && ab === zb) grund = `Build „${ab.name}“ braucht es: ${refText(aRefs)}.`;
-    else if (inA && inZ) grund = `Aktueller Build „${ab.name}“: ${refText(aRefs)} · Ziel-Build „${zb.name}“: ${refText(zRefs)}.`;
-    else if (inA) grund = `Aktueller Build „${ab.name}“ braucht es: ${refText(aRefs)}.`;
-    else { grund = `Für späteren Build „${zb.name}“: ${refText(zRefs)}.`; hinweis = 'für späteren Build'; }
-  } else if (sammel) {
-    verdikt = 'BEHALTEN';
-    grund = 'Steht auf der Sammelliste' + (sammel.notiz ? `: ${sammel.notiz}` : '.');
-  } else if (dbV) {
-    verdikt = dbV;
-    grund = dbGrund;
-  } else {
-    verdikt = 'UNBEKANNT';
-    grund = entry.pseudo
-      ? 'Kommt nur in einem inaktiven Build oder einer Liste vor – keine Einstufung in data.json.'
-      : 'Noch kein Verdikt in data.json eingetragen.';
-  }
-
-  // Andere (weder aktive noch Ziel-) Builds als Info
-  const andere = state.builds
-    .filter(b => b !== ab && b !== zb)
-    .map(b => ({ b, refs: buildRefs(b, keys) }))
-    .filter(x => x.refs.length);
-
-  // Standard-Verdikt aus den Daten zeigen, wenn es überstimmt wurde
-  const dbHinweis = dbV && dbV !== verdikt ? { v: dbV, grund: dbGrund } : null;
-
-  return { verdikt, grund, hinweis, zuordnung, andere, dbHinweis };
+  const a = buildRefs(ab, keys), z = buildRefs(zb, keys);
+  return { a, z, ab, zb, inA: a.length > 0, inZ: z.length > 0 };
 }
 
-function quellenFuer(entry) {
+function badgeHtml(bz) {
+  if (bz.inA && bz.inZ) return '<span class="badge both">für beide</span>';
+  if (bz.inA) return '<span class="badge aktiv">für aktuellen Build</span>';
+  if (bz.inZ) return '<span class="badge ziel">für Ziel-Build</span>';
+  return '<span class="badge none">in keinem Build</span>';
+}
+function bezugDetail(bz) {
+  const parts = [];
+  if (bz.inA) parts.push(`${bz.ab.name}: ${refText(bz.a)}`);
+  if (bz.inZ && bz.zb !== bz.ab) parts.push(`${bz.zb.name}: ${refText(bz.z)}`);
+  return parts.join(' · ');
+}
+
+function abweichungFuer(keys, regelId) {
+  return state.profil.abweichungen.find(a => {
+    const n = norm(a.bezug);
+    if (!n) return false;
+    if (regelId && n === norm(regelId)) return true;
+    return keys.some(k => k === n);
+  }) || null;
+}
+
+/**
+ * Verdikt in drei Stufen: Grundlage (Eintrag/Regel) → eigene Abweichung (Profil) → Build-Übersteuerung.
+ */
+function endVerdikt(basis, abw, bz) {
+  const zeilen = [];
+  let v = basis;
+  if (abw && abw.verdikt) {
+    zeilen.push({ art: 'abw', text: `Eigene Abweichung: ${abw.verdikt}${basis && !istVerdikt(basis, abw.verdikt) ? ` statt ${basis}` : ''}${abw.begruendung ? ` – ${abw.begruendung}` : ''}` });
+    v = abw.verdikt;
+  }
+  if (bz && (bz.inA || bz.inZ) && !istVerdikt(v, 'BEHALTEN') && !istVerdikt(v, 'ANLEGEN')) {
+    const wo = bz.inA && bz.inZ ? 'in beiden Builds' : bz.inA ? 'im aktuellen Build' : 'im Ziel-Build';
+    zeilen.push({ art: 'build', text: v ? `BEHALTEN statt ${v} – wird ${wo} gebraucht` : `BEHALTEN – wird ${wo} gebraucht` });
+    v = 'BEHALTEN';
+  }
+  return { verdikt: v, zeilen };
+}
+
+function quellenFuer(keys, eigene) {
   const out = [];
-  if (entry.src.quelle) out.push(listText(entry.src.quelle));
-  for (const f of state.data.farmziele) {
-    const hit = asArray(f.belohnungen).some(x => {
-      const n = norm(itemText(x));
-      return entry.keys.some(k => hasWords(n, k));
-    });
-    if (hit) {
-      const q = bi(f.quelle_de || f.quelle, f.quelle_en);
-      const qNames = [f.quelle_de, f.quelle, f.quelle_en].map(norm).filter(Boolean);
-      if (!q) continue;
-      // Doppelte Nennung vermeiden, wenn der Eintrag die Quelle schon selbst nennt
-      const dup = out.findIndex(o => qNames.includes(norm(o)) || norm(o) === norm(q));
-      const text = f.typ ? `${q} [${f.typ}]` : q;
-      if (dup >= 0) out[dup] = text; else out.push(text);
-    }
+  if (eigene) asArray(eigene).forEach(q => { const t = quelleText(q); if (t) out.push(t); });
+  for (const f of state.wissen.farmziele) {
+    const hit = asArray(f.belohnungen).some(x => { const n = norm(itemText(x)); return keys.some(k => hasWords(n, k)); });
+    if (!hit) continue;
+    const t = farmQuelle(f);
+    if (!t) continue;
+    const plain = norm(t.replace(/\s*\[.*\]$/, ''));
+    const dup = out.findIndex(o => { const po = norm(o.replace(/\s*\[.*\]$/, '')); return po === plain || hasWords(plain, po); });
+    if (dup >= 0) out[dup] = t; else out.push(t);
   }
   return out;
 }
 
-function rezepteFuer(entry) {
-  const ids = asArray(entry.src.rezepte);
-  const touches = x => { const n = norm(listText(x)); return entry.keys.some(k => hasWords(n, k)); };
-  return state.data.rezepte
-    .map(r => {
-      let rolle = '';
-      if (ids.includes(r.id)) rolle = 'verknüpft';
-      else if (touches(r.ergebnis)) rolle = 'Ergebnis';
-      else if (touches(r.input)) rolle = 'Zutat';
-      else if (touches(r.kosten)) rolle = 'Material';
-      return rolle ? { r, rolle } : null;
-    })
-    .filter(Boolean);
+function rezepteFuer(keys, ids) {
+  ids = asArray(ids);
+  const touches = x => { const n = norm(listText(x)); return keys.some(k => hasWords(n, k)); };
+  return state.wissen.rezepte.map(r => {
+    let rolle = '';
+    if (r.id && ids.includes(r.id)) rolle = 'verknüpft';
+    else if (touches(r.ergebnis)) rolle = 'Ergebnis';
+    else if (touches(r.input)) rolle = 'Zutat';
+    else if (touches(r.kosten)) rolle = 'Material';
+    return rolle ? { r, rolle } : null;
+  }).filter(Boolean);
 }
 
-/* ---------------- Rendering: Rahmen ---------------- */
+function notizenFuer(typen, qa) {
+  const typT = typen.flatMap(tokens);
+  return state.wissen.notizen.filter(n => {
+    if (asArray(n.typen).flatMap(tokens).some(t => typT.some(x => wordEq(t, x)))) return true;
+    return asArray(n.schlagworte).some(sw => {
+      const s = norm(sw);
+      if (!s) return false;
+      return s.includes(' ') ? phraseIn(qa.q, s) : qa.q.split(' ').some(t => wordEq(t, s));
+    });
+  });
+}
+
+/* ================================================================
+   Rendering: Rahmen
+   ================================================================ */
 
 function setTab(tab) {
   state.tab = tab;
   state.editor = null;
   state.importOpen = false;
-  lsSet(LS.tab, tab);
+  state.eintragEditor = null;
+  state.dateienOpen = false;
   render();
   window.scrollTo(0, 0);
 }
 
 function renderHeader() {
+  const w = state.wissen;
+  const alt = istAlt(w.stand);
+  $('#wissen-meta').innerHTML = `Wissen v${esc(w.version || '?')} · Stand ${esc(w.stand || '?')}` +
+    (ageDays(w.stand) > 0 ? ` (vor ${ageDays(w.stand)} T.)` : '') + (alt ? ' ' + staleIcon(w.stand) : '');
   const ab = aktivBuild(), zb = zielBuild();
   $('#build-info').innerHTML =
-    `Aktiv: <b>${esc(ab ? ab.name : '–')}</b> · Ziel: <b>${esc(zb ? zb.name : '–')}</b>`;
+    `Aktiv: <b>${esc(ab ? ab.name : '–')}</b>${ab ? staleIcon(ab.datum) : ''} · Ziel: <b>${esc(zb ? zb.name : '–')}</b>${zb ? staleIcon(zb.datum) : ''}`;
   document.querySelectorAll('#tabs button').forEach(b =>
-    b.classList.toggle('active', b.dataset.tab === state.tab));
+    b.classList.toggle('active', !state.dateienOpen && b.dataset.tab === state.tab));
+  $('#btn-dateien').classList.toggle('active', state.dateienOpen);
 
-  const msgs = [];
-  if (state.dataError) msgs.push(`<div class="msg ${state.dataSource === 'leer' ? 'err' : 'warn'}">${esc(state.dataError)}</div>`);
-  const warnTage = state.data.einstellungen.warnTageBuildAlter;
-  for (const [b, rolle] of [[ab, 'Aktiver Build'], [zb, 'Ziel-Build']]) {
-    if (!b || (rolle === 'Ziel-Build' && b === ab)) continue;
-    const age = ageDays(b.datum);
-    if (age != null && age > warnTage) {
-      msgs.push(`<div class="msg warn">${rolle} „${esc(b.name)}“ ist ${age} Tage alt – Guide auf Aktualität prüfen.</div>`);
-    }
-  }
-  $('#banner').innerHTML = msgs.join('');
+  $('#banner').innerHTML = state.meldungen.map((m, i) =>
+    `<div class="msg ${m.art}">${esc(m.text)}
+      ${m.aktion ? `<button class="btn" data-act="${m.aktion.act}">${esc(m.aktion.label)}</button>` : ''}
+      <button class="msg-x" data-act="msg-x" data-i="${i}" aria-label="Hinweis schließen">×</button></div>`).join('');
 }
 
 function render() {
   renderHeader();
   const main = $('#main');
+  if (state.dateienOpen) { main.innerHTML = viewDateien(); return; }
   switch (state.tab) {
     case 'builds': main.innerHTML = state.editor ? viewEditor() : state.importOpen ? viewImport() : viewBuilds(); break;
-    case 'ziel': main.innerHTML = viewZiel(); break;
-    case 'wuerfel': main.innerHTML = viewWuerfel(); break;
-    case 'farmen': main.innerHTML = viewFarmen(); break;
-    case 'sammeln': main.innerHTML = viewSammeln(); break;
-    case 'daten': main.innerHTML = viewDaten(); break;
-    default: renderSuche(main);
+    case 'checkliste': main.innerHTML = viewCheckliste(); break;
+    case 'rezepte': main.innerHTML = viewRezepte(); break;
+    case 'farmziele': main.innerHTML = viewFarmziele(); break;
+    case 'wissen': main.innerHTML = state.eintragEditor ? viewEintragEditor() : viewWissen(); break;
+    case 'abweichungen': main.innerHTML = viewAbweichungen(); break;
+    default:
+      if (state.eintragEditor) main.innerHTML = viewEintragEditor();
+      else renderSuche(main);
   }
 }
 
-/* ---------------- Ansicht: Suche ---------------- */
+/* ================================================================
+   Ansicht: Suche
+   ================================================================ */
 
 function renderSuche(main) {
   main.innerHTML = `
     <div class="search-wrap">
       <input id="q" class="search" type="search" autocomplete="off" autocapitalize="off" spellcheck="false"
-        placeholder="Item, Rune, Splitter, Material … (DE/EN)" value="${esc(state.query)}">
+        placeholder="Item, Rune, Kategorie … (DE/EN)" value="${esc(state.query)}" autofocus>
     </div>
     <div id="results"></div>`;
   const input = $('#q');
   input.addEventListener('input', () => { state.query = input.value; renderResults(); });
   renderResults();
-  if (!('ontouchstart' in window)) input.focus();
+  input.focus();
 }
 
 function renderResults() {
   const box = $('#results');
   if (!box) return;
-  const q = state.query.trim();
-  if (!q) {
-    const n = state.data.eintraege.length;
-    box.innerHTML = `<p class="muted small">${n} Einträge in data.json${state.builds.length ? `, ${state.builds.length} Build(s)` : ''}. Tippe einen Namen auf Deutsch oder Englisch.</p>` +
-      (n === 0 && !state.builds.length ? `<div class="msg info">Noch keine Daten. Trage Items in <code>data/data.json</code> ein oder lege unter „Builds“ einen Build an.</div>` : '');
-    return;
+  const q = norm(state.query);
+  if (!q) { box.innerHTML = viewSammelliste(); return; }
+
+  const qa = analysiere(q);
+  const qTokens = q.split(' ');
+  const nameHits = INDEX.map(e => ({ e, s: nameScore(e.keys, q, qTokens) })).filter(x => x.s > 0)
+    .sort((a, b) => b.s - a.s || a.e.anzeige.localeCompare(b.e.anzeige, 'de'));
+  const stark = nameHits.filter(x => x.s >= 75);
+  const cards = [];
+  const gezeigt = new Set();   // Notizen nur einmal zeigen
+
+  if (stark.some(x => x.e.kind === 'eintrag')) {
+    // a) Treffer in eintraege (plus gleich gute Namen aus Builds/Listen)
+    stark.slice(0, 15).forEach(x => cards.push(cardName(x.e, qa, gezeigt)));
+  } else {
+    // b) Regeln
+    const regeln = regelnFuerSuche(qa);
+    regeln.slice(0, 6).forEach(x => cards.push(cardRegel(x.r, qa, gezeigt, x.fallback)));
+    // Namen, die nur in Builds/Listen stehen
+    const namen = nameHits.filter(x => x.e.kind === 'name' && x.s >= 75).slice(0, 8);
+    namen.forEach(x => cards.push(cardName(x.e, qa, gezeigt)));
+    // c) nichts erfasst
+    if (!regeln.length && !namen.some(x => x.s >= 95)) cards.unshift(cardLeer(state.query.trim(), qa, gezeigt));
+    // schwächere Namenstreffer
+    const schwach = nameHits.filter(x => !namen.includes(x)).slice(0, 8);
+    if (schwach.length) {
+      cards.push(`<h3 class="muted small">Ähnliche Einträge</h3>`);
+      schwach.forEach(x => cards.push(cardName(x.e, qa, gezeigt)));
+    }
   }
-  const hits = search(q);
-  if (!hits.length) {
-    box.innerHTML = `<div class="card"><div class="res-head">${verdiktHtml('UNBEKANNT', true)}<span class="res-name">${esc(q)}</span></div>
-      <p class="res-reason">Nicht gefunden – weder in data.json noch in einem Build. Im Zweifel: in data.json nachtragen.</p></div>`;
-    return;
-  }
-  box.innerHTML = hits.map((e, i) => resultCard(e, i === 0)).join('');
+  box.innerHTML = cards.join('');
 }
 
-function resultCard(e, best) {
-  const b = bewerten(e);
-  const quellen = quellenFuer(e);
-  const rezepte = rezepteFuer(e);
+function notizenHtml(typen, qa, gezeigt) {
+  const n = notizenFuer(typen, qa).filter(x => !gezeigt.has(x));
+  n.forEach(x => gezeigt.add(x));
+  if (!n.length) return '';
+  return `<div class="notes">${n.map(notizKarte).join('')}</div>`;
+}
+function notizKarte(n) {
+  return `<details class="note"><summary>${esc(n.frage || '(ohne Frage)')} ${staleIcon(n.stand)}</summary>
+    <div class="note-body">${n.antwort ? esc(n.antwort).replace(/\n/g, '<br>') : '<span class="muted">Noch keine Antwort eingetragen.</span>'}
+    ${asArray(n.typen).length || asArray(n.schlagworte).length ? `<div class="small muted" style="margin-top:6px">
+      ${asArray(n.typen).map(t => `<span class="tag">${esc(t)}</span>`).join('')}
+      ${asArray(n.schlagworte).map(t => `<span class="tag">#${esc(t)}</span>`).join('')}</div>` : ''}
+    ${n.stand ? `<div class="small muted">Stand ${esc(n.stand)}</div>` : ''}</div></details>`;
+}
+
+function zeilenHtml(zeilen) {
+  return zeilen.map(z => `<div class="override ${z.art}">${esc(z.text)}</div>`).join('');
+}
+
+function extraRows(keys, quellenRoh, rezeptIds) {
   const rows = [];
-  rows.push(`<div><span class="k">Build</span>${esc(b.zuordnung)}${b.hinweis ? ` <span class="tag ziel">${esc(b.hinweis)}</span>` : ''}</div>`);
-  if (b.andere.length) {
-    rows.push(`<div><span class="k">Auch in</span>${b.andere.map(x => `${esc(x.b.name)} (${esc(refText(x.refs))})`).join('; ')} <span class="muted">– nicht aktiv/Ziel</span></div>`);
-  }
+  const quellen = quellenFuer(keys, quellenRoh);
   if (quellen.length) rows.push(`<div><span class="k">Quelle</span>${esc(quellen.join(' · '))}</div>`);
-  for (const { r, rolle } of rezepte) {
-    rows.push(`<div><span class="k">Würfel</span><b>${esc(bi(r.name_de || r.name, r.name_en) || r.id || 'Rezept')}</b> <span class="muted">(${esc(rolle)})</span><br>
+  for (const { r, rolle } of rezepteFuer(keys, rezeptIds)) {
+    rows.push(`<div><span class="k">Würfel</span><b>${esc(bi(r.name_de || r.name, r.name_en) || r.id || 'Rezept')}</b> <span class="muted">(${esc(rolle)})</span> ${staleIcon(r.stand)}<br>
       ${r.input ? `Input: ${esc(listText(r.input))}<br>` : ''}
       ${r.kosten ? `Kosten: ${esc(listText(r.kosten))}<br>` : ''}
       ${r.ergebnis ? `Ergebnis: ${esc(listText(r.ergebnis))}` : ''}</div>`);
   }
-  if (b.dbHinweis) {
-    rows.push(`<div><span class="k">Sonst</span>${verdiktHtml(b.dbHinweis.v)} ${esc(b.dbHinweis.grund)}</div>`);
-  }
-  if (e.src.notiz) rows.push(`<div><span class="k">Notiz</span>${esc(e.src.notiz)}</div>`);
+  return rows;
+}
 
-  return `<div class="card${best ? ' best' : ''}">
-    <div class="res-head">${verdiktHtml(b.verdikt, true)}
-      <span class="res-name">${esc(e.anzeige)}</span>
-      ${e.typ ? `<span class="res-typ">${esc(e.typ)}</span>` : ''}</div>
-    ${b.grund ? `<p class="res-reason">${esc(b.grund)}</p>` : ''}
+function ausnahmeVonHtml(keys) {
+  return state.wissen.regeln.filter(r => istAusnahme(r, keys)).map(r =>
+    `<div><span class="k">Ausnahme</span>von Regel <b>${esc(r.id)}</b>${r.verdikt ? ` (dort: ${esc(r.verdikt)})` : ''}${r.ausnahmeText ? ` – ${esc(r.ausnahmeText)}` : ''}</div>`).join('');
+}
+
+/** Treffer über einen Namen (Eintrag oder nur aus Build/Liste bekannt). */
+function cardName(e, qa, gezeigt) {
+  const src = e.src;
+  const bz = buildBezug(e.keys);
+  let basis = '', grund = '', regelHinweis = '';
+  if (e.kind === 'eintrag') {
+    basis = src.verdikt || '';
+    grund = src.begruendung || '';
+    if (!basis) {
+      const r = regelFuerEintrag(src, bz.inA || bz.inZ);
+      if (r) { basis = r.verdikt || ''; grund = r.begruendung || ''; regelHinweis = `laut Regel ${r.id}`; }
+    }
+  }
+  const abw = abweichungFuer(e.keys);
+  const ev = endVerdikt(basis, abw, bz);
+  const typen = e.kind === 'eintrag' ? [src.typ, src.itemTyp].filter(Boolean) : [];
+  const meta = [src.typ, src.itemTyp, src.seltenheit ? seltenheitAnzeige(seltenheitKanon(src.seltenheit)) : ''].filter(Boolean);
+
+  const rows = [];
+  rows.push(`<div><span class="k">Build</span>${badgeHtml(bz)} ${esc(bezugDetail(bz))}</div>`);
+  const andere = state.profil.builds.filter(b => b !== bz.ab && b !== bz.zb)
+    .map(b => ({ b, refs: buildRefs(b, e.keys) })).filter(x => x.refs.length);
+  if (andere.length) rows.push(`<div><span class="k">Auch in</span>${andere.map(x => esc(`${x.b.name} (${refText(x.refs)})`)).join('; ')} <span class="muted">– weder aktiv noch Ziel</span></div>`);
+  rows.push(ausnahmeVonHtml(e.keys));
+  rows.push(...extraRows(e.keys, src.quelle, src.rezepte));
+  if (src.notiz) rows.push(`<div><span class="k">Notiz</span>${esc(src.notiz)}</div>`);
+
+  const leer = e.kind !== 'eintrag';
+  return `<div class="card">
+    <div class="res-head">${verdiktHtml(ev.verdikt, true)}
+      <span class="res-name">${esc(e.anzeige)}</span> ${staleIcon(src.stand)}</div>
+    <div class="res-typ">${leer ? `Kein Eintrag – noch nicht erfasst · bekannt aus ${esc(e.herkunft.join(', '))}` : esc(['Eintrag', ...meta].join(' · '))}${regelHinweis ? ` · ${esc(regelHinweis)}` : ''}</div>
+    ${zeilenHtml(ev.zeilen)}
+    ${grund ? `<p class="res-reason">${ev.zeilen.length ? '<span class="muted">Ursprünglich:</span> ' : ''}${esc(grund)}</p>` : ''}
     <div class="res-rows">${rows.join('')}</div>
+    ${leer ? `<div class="btn-row"><button class="btn" data-act="rohling" data-name="${esc(e.anzeige)}">Als Eintrag anlegen</button></div>`
+      : `<div class="btn-row"><button class="btn small-btn" data-act="eintrag-edit" data-i="${e.index}">Eintrag bearbeiten</button></div>`}
+    ${notizenHtml(typen, qa, gezeigt)}
   </div>`;
 }
 
-/* ---------------- Ansicht: Builds ---------------- */
+function trifftHtml(t) {
+  const parts = Object.entries(t || {}).map(([k, v]) => {
+    let val;
+    if (typeof v === 'boolean') val = v ? 'ja' : 'nein';
+    else if (k === 'seltenheit') val = asArray(v).map(x => seltenheitAnzeige(seltenheitKanon(x))).join(', ');
+    else val = asArray(v).join(', ');
+    return `${TRIFFT_LABEL[k] || k}: ${val}`;
+  });
+  return parts.join(' · ');
+}
+
+function cardRegel(r, qa, gezeigt, fallback) {
+  const ausn = asArray(r.ausnahmen).map(itemText).filter(Boolean);
+  // Build-Bezug einer Kategorie = Bezug ihrer Ausnahmen
+  const ausnBz = ausn.map(a => ({ a, bz: buildBezug([norm(a)]) }));
+  const inA = ausnBz.some(x => x.bz.inA), inZ = ausnBz.some(x => x.bz.inZ);
+  const abw = abweichungFuer([], r.id);
+  const ev = endVerdikt(r.verdikt || '', abw, null);
+  const typen = [...asArray(r.trifft?.typ), ...asArray(r.trifft?.itemTyp)].filter(x => x !== '*');
+
+  const rows = [];
+  rows.push(`<div><span class="k">Build</span>${badgeHtml({ inA, inZ })}${ausn.length ? ' <span class="muted small">(über die Ausnahmen)</span>' : ''}</div>`);
+  const bed = trifftHtml(r.trifft);
+  if (bed) rows.push(`<div><span class="k">Gilt für</span>${esc(bed)}</div>`);
+  if (ausn.length) {
+    rows.push(`<div class="ausnahmen"><span class="k">Ausnahmen</span>${r.ausnahmeText ? `<b>${esc(r.ausnahmeText)}</b>` : ''}
+      <ul>${ausnBz.map(({ a, bz }) => `<li>${esc(a)} ${bz.inA || bz.inZ ? badgeHtml(bz) : ''}</li>`).join('')}</ul></div>`);
+  }
+  if (r.notiz) rows.push(`<div><span class="k">Notiz</span>${esc(r.notiz)}</div>`);
+
+  return `<div class="card">
+    <div class="res-head">${verdiktHtml(ev.verdikt, true)}
+      <span class="res-name">${esc(state.query.trim())}</span> ${staleIcon(r.stand)}</div>
+    <div class="res-typ">${fallback ? 'Fallback-Regel' : 'Regel'} · ${esc(r.id)}</div>
+    ${zeilenHtml(ev.zeilen)}
+    ${r.begruendung ? `<p class="res-reason">${ev.zeilen.length ? '<span class="muted">Ursprünglich:</span> ' : ''}${esc(r.begruendung)}</p>` : ''}
+    <div class="res-rows">${rows.join('')}</div>
+    ${notizenHtml(typen, qa, gezeigt)}
+  </div>`;
+}
+
+function cardLeer(text, qa, gezeigt) {
+  const bz = buildBezug([norm(text)]);
+  const ev = endVerdikt('', abweichungFuer([norm(text)]), bz);
+  return `<div class="card">
+    <div class="res-head">${verdiktHtml(ev.verdikt, true)}<span class="res-name">${esc(text)}</span></div>
+    <div class="res-typ">Kein Eintrag – noch nicht erfasst</div>
+    ${zeilenHtml(ev.zeilen)}
+    <div class="res-rows"><div><span class="k">Build</span>${badgeHtml(bz)}</div></div>
+    <div class="btn-row"><button class="btn" data-act="rohling" data-name="${esc(text)}">Als Eintrag anlegen</button></div>
+    ${notizenHtml([], qa, gezeigt)}
+  </div>`;
+}
+
+/* ---------- Sammelliste (Startseite) ---------- */
+
+function viewSammelliste() {
+  const list = state.profil.sammelliste;
+  const items = list.map((x, i) => {
+    const text = itemText({ name_de: x.name_de || x.name, name_en: x.name_en });
+    return `<div class="check${x.erledigt ? ' done' : ''}">
+      <input type="checkbox" data-act="sammel" data-i="${i}" ${x.erledigt ? 'checked' : ''} aria-label="erledigt">
+      <span class="ct">${esc(text)}${x.notiz ? `<br><span class="small muted">${esc(x.notiz)}</span>` : ''}</span>
+      <button class="icon-btn" data-act="sammel-del" data-i="${i}" aria-label="Entfernen">×</button></div>`;
+  }).join('');
+  return `
+    <h2>Sammelliste</h2>
+    ${items ? `<div class="card">${items}</div>` : '<p class="small muted">Leer. Hier landet, was du gerade aufheben willst.</p>'}
+    <form class="add-row" data-form="sammel-add">
+      <input type="text" name="text" placeholder="Hinzufügen … (z. B. Name DE / Name EN)" autocomplete="off">
+      <button class="btn" type="submit">+</button>
+    </form>
+    <p class="small muted">${state.wissen.eintraege.length} Einträge · ${state.wissen.regeln.length} Regeln · ${state.wissen.notizen.length} Notizen im Wissen.</p>`;
+}
+
+/* ================================================================
+   Ansicht: Builds
+   ================================================================ */
 
 function viewBuilds() {
-  const warnTage = state.data.einstellungen.warnTageBuildAlter;
-  const cards = state.builds.map(b => {
+  const p = state.profil;
+  const cards = p.builds.map(b => {
     const age = ageDays(b.datum);
-    const alt = age != null && age > warnTage;
+    const alt = istAlt(b.datum);
     const url = safeUrl(b.quelleUrl);
     const wk = b.wechselkriterien;
     const wkDone = wk.filter(w => w.erledigt).length;
@@ -543,9 +986,9 @@ function viewBuilds() {
     return `<div class="card">
       <div class="res-head">
         <span class="res-name">${esc(b.name || '(ohne Namen)')}</span>
-        ${b.id === state.aktivId ? '<span class="tag aktiv">AKTIV</span>' : ''}
-        ${b.id === state.zielId ? '<span class="tag ziel">ZIEL</span>' : ''}
-        ${alt ? `<span class="tag warn">${age} Tage alt</span>` : ''}
+        ${b.id === p.aktiverBuild ? '<span class="badge aktiv">AKTIV</span>' : ''}
+        ${b.id === p.zielBuild ? '<span class="badge ziel">ZIEL</span>' : ''}
+        ${staleIcon(b.datum)}
       </div>
       <div class="kv small">
         ${b.klasse ? `<span class="k">Klasse:</span> ${esc(b.klasse)} · ` : ''}
@@ -553,13 +996,13 @@ function viewBuilds() {
         ${url ? `<br><span class="k">Quelle:</span> <a href="${esc(url)}" target="_blank" rel="noopener">${esc(url)}</a>` : b.quelleUrl ? `<br><span class="k">Quelle:</span> ${esc(b.quelleUrl)}` : ''}
         ${b.notiz ? `<br>${esc(b.notiz)}` : ''}
       </div>
-      ${alt ? `<div class="msg warn">Dieser Build ist älter als ${warnTage} Tage. Prüfe, ob der Guide noch aktuell ist, und aktualisiere das Datum.</div>` : ''}
+      ${alt ? `<div class="msg warn">Älter als ${warnTage()} Tage – prüfe, ob der Guide noch aktuell ist, und aktualisiere das Datum.</div>` : ''}
       <div class="btn-row">
-        ${b.id !== state.aktivId ? `<button class="btn" data-act="set-aktiv" data-id="${b.id}">Als aktiv</button>` : ''}
-        ${b.id !== state.zielId ? `<button class="btn" data-act="set-ziel" data-id="${b.id}">Als Ziel</button>` : `<button class="btn" data-act="unset-ziel">Ziel entfernen</button>`}
-        <button class="btn" data-act="edit" data-id="${b.id}">Bearbeiten</button>
-        <button class="btn" data-act="dup" data-id="${b.id}">Duplizieren</button>
-        <button class="btn danger" data-act="del" data-id="${b.id}">Löschen</button>
+        ${b.id !== p.aktiverBuild ? `<button class="btn" data-act="set-aktiv" data-id="${esc(b.id)}">Als aktiv</button>` : ''}
+        ${b.id !== p.zielBuild ? `<button class="btn" data-act="set-ziel" data-id="${esc(b.id)}">Als Ziel</button>` : `<button class="btn" data-act="unset-ziel">Ziel entfernen</button>`}
+        <button class="btn" data-act="edit" data-id="${esc(b.id)}">Bearbeiten</button>
+        <button class="btn" data-act="dup" data-id="${esc(b.id)}">Duplizieren</button>
+        <button class="btn danger" data-act="del" data-id="${esc(b.id)}">Löschen</button>
       </div>
       ${slotRows ? `<details><summary class="small muted">Slots anzeigen</summary><table class="slots">${slotRows}</table></details>` : '<p class="small muted">Noch keine Slots ausgefüllt.</p>'}
       <h3>Wechselkriterien ${wk.length ? `<span class="muted small">${wkDone}/${wk.length}</span>` : ''}</h3>
@@ -567,7 +1010,7 @@ function viewBuilds() {
         <div class="progress"><span style="width:${Math.round(wkDone / wk.length * 100)}%"></span></div>
         ${wkDone === wk.length ? '<div class="msg info">Alle Kriterien erfüllt – bereit zum Umstieg.</div>' : ''}
         ${wk.map((w, i) => `<label class="check${w.erledigt ? ' done' : ''}">
-          <input type="checkbox" data-act="wk" data-id="${b.id}" data-i="${i}" ${w.erledigt ? 'checked' : ''}>
+          <input type="checkbox" data-act="wk" data-id="${esc(b.id)}" data-i="${i}" ${w.erledigt ? 'checked' : ''}>
           <span class="ct">${esc(w.text)}</span></label>`).join('')}`
         : '<p class="small muted">Keine Kriterien. Unter „Bearbeiten“ festlegen, was vor dem Umstieg da sein muss.</p>'}
     </div>`;
@@ -581,7 +1024,7 @@ function viewBuilds() {
     ${cards || '<div class="msg info">Noch keine Builds. Lege einen an oder füge Text aus einem Build-Guide ein.</div>'}`;
 }
 
-/* ---------------- Ansicht: Guide-Import ---------------- */
+/* ---------- Guide-Import ---------- */
 
 function viewImport() {
   return `
@@ -614,19 +1057,17 @@ const SLOT_PATTERNS = [
   ['waffe', /^(weapon|main hand|mainhand|main hand weapon|two handed|two handed weapon|2h|2h weapon|1h|1h weapon|one handed|waffe|haupthand|zweihand|zweihandwaffe|einhandwaffe|bludgeoning|slashing|bludgeoning weapon|slashing weapon|dual wield 1|dual wield|weapon 1)$/],
   ['fokus', /^(offhand|off hand|focus|shield|totem|fokus|nebenhand|schild|weapon 2|dual wield 2)$/],
 ];
-
 function slotFromLabel(label) {
   const n = norm(label);
   if (!n || n.length > 30) return '';
   for (const [key, re] of SLOT_PATTERNS) if (re.test(n)) return key;
   return '';
 }
-
-/** Findet genau einen bekannten Datenbank-Eintrag im Text → kanonische Anzeige "DE (EN)". */
+/** Findet genau einen Eintrag aus wissen.json im Text → kanonische Anzeige "DE (EN)". */
 function canonical(text) {
   const n = norm(text);
-  const hits = INDEX.filter(e => !e.pseudo && e.keys.some(k => k.length >= 3 && hasWords(n, k)));
-  return hits.length === 1 ? { text: hits[0].anzeige, erkannt: true } : { text: text.trim(), erkannt: false };
+  const hits = INDEX.filter(e => e.kind === 'eintrag' && e.keys.some(k => k.length >= 3 && hasWords(n, k)));
+  return hits.length === 1 ? { text: hits[0].anzeige, erkannt: true } : { text: String(text).trim(), erkannt: false };
 }
 
 const RE_ASPECT = /\b(aspect|aspekt)\b/i;
@@ -639,10 +1080,7 @@ function parseGuide(text) {
   SLOTS.forEach(s => { slots[s.key] = emptySlot(); });
   const unassigned = [];
   const erkannt = new Set();
-  let current = '';
-  let waitingValue = false;
-  let url = '';
-  let firstLine = '';
+  let current = '', waitingValue = false, url = '', firstLine = '';
 
   const setMain = (key, value) => {
     const sl = slots[key];
@@ -662,7 +1100,6 @@ function parseGuide(text) {
     if (u && !url) { url = u[0].replace(/[)\].,]+$/, ''); continue; }
 
     const stripped = line.replace(RE_BULLET, '');
-    // "Label: Wert" / "Label - Wert" / "Label<TAB>Wert" / "Label | Wert"
     const m = stripped.match(/^([^:\t|–]{1,30}?)\s*(?::|\t|\||\s[-–]\s)\s*(.+)$/);
     let key = m ? slotFromLabel(m[1]) : '';
     if (key) {
@@ -671,7 +1108,6 @@ function parseGuide(text) {
       setMain(key, m[2]);
       continue;
     }
-    // Slotname allein auf einer Zeile → Wert folgt
     let only = slotFromLabel(stripped.replace(/[:\-–]\s*$/, ''));
     if (only) {
       if (only === 'ring') only = resolveRing();
@@ -694,14 +1130,13 @@ function parseGuide(text) {
     } else if (RE_BULLET.test(line)) {
       sl.affixe.push(stripped);
     } else {
-      // Nicht eindeutig – lieber zeigen als falsch zuordnen
       unassigned.push(line);
     }
   }
   return { slots, unassigned, url, firstLine, erkannt };
 }
 
-/* ---------------- Ansicht: Build-Editor ---------------- */
+/* ---------- Build-Editor ---------- */
 
 function startEditor(build, isNew, extra = {}) {
   state.editor = Object.assign({ draft: normalizeBuild(structuredClone(build)), isNew, unassigned: [], erkannt: new Set(), preview: false }, extra);
@@ -710,19 +1145,18 @@ function startEditor(build, isNew, extra = {}) {
   window.scrollTo(0, 0);
 }
 
-function slotSummary(sl) {
-  return [sl.zielItem, sl.zielAspekt].filter(Boolean).join(' / ');
+function namenDatalist() {
+  return `<datalist id="dl-names">${INDEX.filter(e => e.kind === 'eintrag').map(e => `<option value="${esc(e.anzeige)}">`).join('')}</datalist>`;
 }
 
 function viewEditor() {
   const { draft: b, isNew, unassigned, preview, erkannt } = state.editor;
-  const names = INDEX.filter(e => !e.pseudo).map(e => `<option value="${esc(e.anzeige)}">`).join('');
   const slotForms = SLOTS.map(s => {
     const sl = b.slots[s.key];
-    const sum = slotSummary(sl);
-    const mark = t => erkannt.has(`${s.key}.${t}`) ? ' <span class="recognized">✓ in data.json erkannt</span>' : '';
+    const sum = [sl.zielItem, sl.zielAspekt].filter(Boolean).join(' / ');
+    const mark = t => erkannt.has(`${s.key}.${t}`) ? ' <span class="recognized">✓ im Wissen erkannt</span>' : '';
     return `<details class="slot" ${preview && sum ? 'open' : ''}>
-      <summary>${esc(s.de)} <span class="muted">(${esc(s.en)})</span>${sum ? ` – <span class="muted">${esc(sum)}</span>` : ''}</summary>
+      <summary>${esc(s.de)}${s.de !== s.en ? ` <span class="muted">(${esc(s.en)})</span>` : ''}${sum ? ` – <span class="muted">${esc(sum)}</span>` : ''}</summary>
       <div class="grid2">
         <label class="f">Ziel-Item${mark('item')}<input type="text" list="dl-names" name="${s.key}.zielItem" value="${esc(sl.zielItem)}"></label>
         <label class="f">Ziel-Aspekt${mark('aspekt')}<input type="text" list="dl-names" name="${s.key}.zielAspekt" value="${esc(sl.zielAspekt)}"></label>
@@ -730,7 +1164,7 @@ function viewEditor() {
         <label class="f">Härtungs-Affix<input type="text" name="${s.key}.haertung" value="${esc(sl.haertung)}"></label>
       </div>
       <label class="f">Affix-Prioritäten (eine pro Zeile, wichtigste zuerst)<textarea name="${s.key}.affixe">${esc(sl.affixe.join('\n'))}</textarea></label>
-      <label class="f">Quelle (optional, sonst aus data.json)<input type="text" name="${s.key}.quelle" value="${esc(sl.quelle)}"></label>
+      <label class="f">Quelle (optional, sonst aus dem Wissen)<input type="text" name="${s.key}.quelle" value="${esc(sl.quelle)}"></label>
     </details>`;
   }).join('');
 
@@ -753,7 +1187,7 @@ function viewEditor() {
       <label class="f">Eine Bedingung pro Zeile – was da sein muss, bevor du umsteigst
         <textarea name="wechselkriterien" id="wk-text">${esc(b.wechselkriterien.map(w => w.text).join('\n'))}</textarea></label>
       <button type="button" class="btn" data-act="wk-from-slots">Ziel-Items der Slots übernehmen</button>
-      <datalist id="dl-names">${names}</datalist>
+      ${namenDatalist()}
       <div class="btn-row" style="margin-top:16px">
         <button type="submit" class="btn primary">Speichern</button>
         <button type="button" class="btn" data-act="cancel">Abbrechen</button>
@@ -762,18 +1196,17 @@ function viewEditor() {
 }
 
 function readEditorForm() {
-  const form = $('#build-form');
-  const fd = new FormData(form);
+  const fd = new FormData($('#build-form'));
   const old = state.editor.draft;
   const b = structuredClone(old);
-  b.name = (fd.get('name') || '').trim() || 'Unbenannter Build';
-  b.klasse = (fd.get('klasse') || '').trim();
-  b.datum = fd.get('datum') || '';
-  b.quelleUrl = (fd.get('quelleUrl') || '').trim();
-  b.notiz = (fd.get('notiz') || '').trim();
+  b.name = String(fd.get('name') || '').trim() || 'Unbenannter Build';
+  b.klasse = String(fd.get('klasse') || '').trim();
+  b.datum = String(fd.get('datum') || '');
+  b.quelleUrl = String(fd.get('quelleUrl') || '').trim();
+  b.notiz = String(fd.get('notiz') || '').trim();
   for (const s of SLOTS) {
     const sl = b.slots[s.key];
-    for (const f of ['zielItem', 'zielAspekt', 'sockel', 'haertung', 'quelle']) sl[f] = (fd.get(`${s.key}.${f}`) || '').trim();
+    for (const f of ['zielItem', 'zielAspekt', 'sockel', 'haertung', 'quelle']) sl[f] = String(fd.get(`${s.key}.${f}`) || '').trim();
     sl.affixe = String(fd.get(`${s.key}.affixe`) || '').split('\n').map(x => x.trim()).filter(Boolean);
   }
   const doneBefore = new Map(old.wechselkriterien.map(w => [norm(w.text), w.erledigt]));
@@ -784,17 +1217,20 @@ function readEditorForm() {
 
 function saveEditor() {
   const b = readEditorForm();
-  const i = state.builds.findIndex(x => x.id === b.id);
-  if (i >= 0) state.builds[i] = b; else state.builds.push(b);
-  if (!state.aktivId) state.aktivId = b.id;
-  saveBuilds();
+  const p = state.profil;
+  const i = p.builds.findIndex(x => x.id === b.id);
+  if (i >= 0) p.builds[i] = b; else p.builds.push(b);
+  if (!p.aktiverBuild) p.aktiverBuild = b.id;
+  saveProfil();
   buildIndex();
   state.editor = null;
   render();
   window.scrollTo(0, 0);
 }
 
-/* ---------------- Ansicht: Ziel-Ausrüstung ---------------- */
+/* ================================================================
+   Ansicht: Checkliste
+   ================================================================ */
 
 function slotQuelle(sl) {
   if (sl.quelle) return sl.quelle;
@@ -802,42 +1238,71 @@ function slotQuelle(sl) {
   for (const t of [sl.zielItem, sl.zielAspekt]) {
     if (!t) continue;
     const n = norm(t);
-    const e = INDEX.find(x => x.keys.some(k => hasWords(n, k)));
-    if (e) out.push(...quellenFuer(e));
+    const e = INDEX.find(x => x.kind === 'eintrag' && x.keys.some(k => hasWords(n, k)));
+    out.push(...quellenFuer(e ? e.keys : [n], e ? e.src.quelle : null));
   }
   return [...new Set(out)].join(' · ');
 }
 
-function viewZiel() {
-  if (!state.builds.length) return '<div class="msg info">Noch keine Builds angelegt.</div>';
-  const id = buildById(state.zielViewId) ? state.zielViewId : (state.zielId || state.aktivId || state.builds[0].id);
-  const b = buildById(id);
-  const rows = SLOTS.map(s => ({ s, sl: b.slots[s.key] })).filter(x => x.sl.zielItem || x.sl.zielAspekt);
-  const done = rows.filter(x => x.sl.erledigt).length;
-  return `
-    <label class="f">Build<select id="ziel-select">${state.builds.map(x =>
-      `<option value="${x.id}" ${x.id === id ? 'selected' : ''}>${esc(x.name)}${x.id === state.zielId ? ' (Ziel)' : x.id === state.aktivId ? ' (aktiv)' : ''}</option>`).join('')}</select></label>
-    ${rows.length ? `<p class="small muted">${done}/${rows.length} erledigt</p>
-      <div class="progress"><span style="width:${Math.round(done / rows.length * 100)}%"></span></div>
+function viewCheckliste() {
+  const ab = aktivBuild(), zb = zielBuild();
+  let html = '';
+  if (!ab) {
+    html += '<div class="msg info">Kein aktiver Build. Unter „Builds“ einen als aktiv markieren.</div>';
+  } else {
+    const rows = SLOTS.map(s => ({ s, sl: ab.slots[s.key] }));
+    const gefuellt = rows.filter(x => x.sl.zielItem || x.sl.zielAspekt);
+    const done = gefuellt.filter(x => x.sl.erledigt).length;
+    html += `<h2>Ziel-Ausrüstung: ${esc(ab.name)} ${staleIcon(ab.datum)}</h2>
+      ${gefuellt.length ? `<p class="small muted">${done}/${gefuellt.length} erledigt</p>
+      <div class="progress"><span style="width:${Math.round(done / gefuellt.length * 100)}%"></span></div>` : ''}
       <div class="card">${rows.map(({ s, sl }) => {
-        const q = slotQuelle(sl);
-        return `<label class="check${sl.erledigt ? ' done' : ''}">
-          <input type="checkbox" data-act="slot-done" data-id="${b.id}" data-slot="${s.key}" ${sl.erledigt ? 'checked' : ''}>
+        const leer = !sl.zielItem && !sl.zielAspekt;
+        const q = leer ? '' : slotQuelle(sl);
+        return `<label class="check${sl.erledigt ? ' done' : ''}${leer ? ' empty' : ''}">
+          <input type="checkbox" data-act="slot-done" data-id="${esc(ab.id)}" data-slot="${s.key}" ${sl.erledigt ? 'checked' : ''} ${leer ? 'disabled' : ''}>
           <span class="ct"><span class="muted small">${esc(s.de)}</span><br>
+            ${leer ? '<span class="muted">– kein Ziel eingetragen –</span>' : ''}
             ${sl.zielItem ? `<b>${esc(sl.zielItem)}</b>` : ''}${sl.zielItem && sl.zielAspekt ? '<br>' : ''}${sl.zielAspekt ? `Aspekt: ${esc(sl.zielAspekt)}` : ''}
-            <br><span class="small muted">Quelle: ${esc(q || '–')}</span></span></label>`;
-      }).join('')}</div>`
-      : '<div class="msg info">In diesem Build sind noch keine Ziel-Items oder Aspekte eingetragen.</div>'}`;
+            ${leer ? '' : `<br><span class="small muted">Quelle: ${esc(q || '–')}</span>`}</span></label>`;
+      }).join('')}</div>`;
+  }
+
+  html += `<h2>Wechselkriterien Ziel-Build${zb ? `: ${esc(zb.name)}` : ''}</h2>`;
+  if (!zb) html += '<p class="small muted">Kein Ziel-Build gesetzt.</p>';
+  else if (!zb.wechselkriterien.length) html += '<p class="small muted">Keine Kriterien eingetragen (Builds → Bearbeiten).</p>';
+  else {
+    const d = zb.wechselkriterien.filter(w => w.erledigt).length;
+    html += `<div class="progress"><span style="width:${Math.round(d / zb.wechselkriterien.length * 100)}%"></span></div>
+      <div class="card">${zb.wechselkriterien.map((w, i) => `<label class="check${w.erledigt ? ' done' : ''}">
+        <input type="checkbox" data-act="wk" data-id="${esc(zb.id)}" data-i="${i}" ${w.erledigt ? 'checked' : ''}>
+        <span class="ct">${esc(w.text)}</span></label>`).join('')}</div>
+      ${d === zb.wechselkriterien.length ? '<div class="msg info">Alle Kriterien erfüllt – bereit zum Umstieg.</div>' : ''}`;
+  }
+
+  const auf = state.profil.offeneAufgaben;
+  html += `<h2>Offene Aufgaben</h2>
+    ${auf.length ? `<div class="card">${auf.map((a, i) => `<div class="check${a.erledigt ? ' done' : ''}">
+      <input type="checkbox" data-act="aufgabe" data-i="${i}" ${a.erledigt ? 'checked' : ''} aria-label="erledigt">
+      <span class="ct">${esc(a.text)}</span>
+      <button class="icon-btn" data-act="aufgabe-del" data-i="${i}" aria-label="Entfernen">×</button></div>`).join('')}</div>` : ''}
+    <form class="add-row" data-form="aufgabe-add">
+      <input type="text" name="text" placeholder="Neue Aufgabe …" autocomplete="off">
+      <button class="btn" type="submit">+</button>
+    </form>`;
+  return html;
 }
 
-/* ---------------- Ansicht: Würfel-Rezepte ---------------- */
+/* ================================================================
+   Ansicht: Rezepte / Farmziele
+   ================================================================ */
 
-function viewWuerfel() {
-  const r = state.data.rezepte;
-  if (!r.length) return '<div class="msg info">Keine Würfel-Rezepte in data.json (Feld „rezepte“).</div>';
+function viewRezepte() {
+  const r = state.wissen.rezepte;
+  if (!r.length) return '<div class="msg info">Keine Würfel-Rezepte in wissen.json (Sektion „rezepte“).</div>';
   return `<h2>Horadrimwürfel (Horadric Cube)</h2>` + r.map(x => `
     <div class="card">
-      <div class="res-name">${esc(bi(x.name_de || x.name, x.name_en) || x.id || 'Rezept')}</div>
+      <div class="res-name">${esc(bi(x.name_de || x.name, x.name_en) || x.id || 'Rezept')} ${staleIcon(x.stand)}</div>
       <div class="res-rows">
         <div><span class="k">Input</span>${esc(listText(x.input) || '–')}</div>
         <div><span class="k">Kosten</span>${esc(listText(x.kosten) || '–')}</div>
@@ -847,150 +1312,273 @@ function viewWuerfel() {
     </div>`).join('');
 }
 
-/* ---------------- Ansicht: Farm-Ziele ---------------- */
-
-function viewFarmen() {
-  const f = state.data.farmziele;
-  if (!f.length) return '<div class="msg info">Keine Farm-Ziele in data.json (Feld „farmziele“).</div>';
-  return `<h2>Farm-Ziele</h2>` + f.map(x => `
+function viewFarmziele() {
+  const f = state.wissen.farmziele;
+  const q = state.wissen.quellen;
+  let html = '';
+  if (!f.length) html += '<div class="msg info">Keine Farm-Ziele in wissen.json (Sektion „farmziele“).</div>';
+  else html += `<h2>Farm-Ziele</h2>` + f.map(x => `
     <div class="card">
-      <div class="res-head"><span class="res-name">${esc(bi(x.quelle_de || x.quelle, x.quelle_en) || '–')}</span>
-        ${x.typ ? `<span class="res-typ">${esc(x.typ)}</span>` : ''}</div>
+      <div class="res-head"><span class="res-name">${esc(farmQuelle(x) || '–')}</span> ${staleIcon(x.stand)}</div>
       <div class="res-rows">
         <div><span class="k">Belohnung</span>${esc(listText(x.belohnungen) || '–')}</div>
         ${x.kosten ? `<div><span class="k">Kosten</span>${esc(listText(x.kosten))}</div>` : ''}
         ${x.notiz ? `<div><span class="k">Notiz</span>${esc(x.notiz)}</div>` : ''}
       </div>
     </div>`).join('');
-}
-
-/* ---------------- Ansicht: Sammelliste ---------------- */
-
-function viewSammeln() {
-  const list = state.data.sammelliste;
-  const manual = list.map(x => {
-    const text = itemText(typeof x === 'string' ? x : { name_de: x.name_de || x.name, name_en: x.name_en });
-    const k = norm(text);
-    const done = !!state.sammelDone[k];
-    return `<label class="check${done ? ' done' : ''}"><input type="checkbox" data-act="sammel" data-k="${esc(k)}" ${done ? 'checked' : ''}>
-      <span class="ct">${esc(text)}${x.notiz ? `<br><span class="small muted">${esc(x.notiz)}</span>` : ''}</span></label>`;
-  }).join('');
-
-  const offen = [];
-  for (const [b, rolle] of [[aktivBuild(), 'aktiv'], [zielBuild(), 'Ziel']]) {
-    if (!b || (rolle === 'Ziel' && b === aktivBuild())) continue;
-    for (const s of SLOTS) {
-      const sl = b.slots[s.key];
-      if (sl.erledigt) continue;
-      for (const t of [sl.zielItem, sl.zielAspekt]) if (t) offen.push({ t, s, b, rolle });
-    }
+  if (q.length) {
+    html += `<h2>Quellen</h2><div class="card">${q.map(x => `<div class="check"><span class="ct">
+      <b>${esc(bi(x.name_de || x.name, x.name_en) || x.id)}</b>${x.typ ? ` <span class="res-typ">${esc(x.typ)}</span>` : ''} ${staleIcon(x.stand)}
+      ${x.notiz ? `<br><span class="small muted">${esc(x.notiz)}</span>` : ''}</span></div>`).join('')}</div>`;
   }
+  return html;
+}
+
+/* ================================================================
+   Ansicht: Wissen (Notizen, Regeln, Einträge)
+   ================================================================ */
+
+function viewWissen() {
+  const w = state.wissen;
+  const notizen = w.notizen.length
+    ? w.notizen.map(notizKarte).join('')
+    : '<p class="small muted">Keine Notizen in wissen.json (Sektion „notizen“).</p>';
+  const regeln = w.regeln.length ? w.regeln.map(r => `
+    <details class="note"><summary>${verdiktHtml(r.verdikt)} ${esc(r.id)} ${staleIcon(r.stand)}</summary>
+      <div class="note-body res-rows">
+        ${trifftHtml(r.trifft) ? `<div><span class="k">Gilt für</span>${esc(trifftHtml(r.trifft))}</div>` : ''}
+        ${asArray(r.suchbegriffe).length ? `<div><span class="k">Suchbegriffe</span>${esc(asArray(r.suchbegriffe).join(', '))}</div>` : ''}
+        ${r.begruendung ? `<div><span class="k">Begründung</span>${esc(r.begruendung)}</div>` : ''}
+        ${asArray(r.ausnahmen).length ? `<div><span class="k">Ausnahmen</span>${esc(asArray(r.ausnahmen).map(itemText).join(', '))}${r.ausnahmeText ? ` – ${esc(r.ausnahmeText)}` : ''}</div>` : ''}
+        ${r.notiz ? `<div><span class="k">Notiz</span>${esc(r.notiz)}</div>` : ''}
+        ${r.stand ? `<div class="small muted">Stand ${esc(r.stand)}</div>` : ''}
+      </div></details>`).join('') : '<p class="small muted">Keine Regeln.</p>';
+  const eintraege = w.eintraege.length ? `<div class="card">${w.eintraege.map((e, i) => `
+    <div class="check"><span class="ct">${e.verdikt ? verdiktHtml(e.verdikt) : ''} <b>${esc(bi(e.name_de || e.name, e.name_en) || '(ohne Namen)')}</b>
+      ${e.typ ? `<span class="res-typ">${esc(e.typ)}</span>` : ''} ${staleIcon(e.stand)}</span>
+      <button class="btn" data-act="eintrag-edit" data-i="${i}">Bearbeiten</button></div>`).join('')}</div>`
+    : '<p class="small muted">Keine Einträge.</p>';
 
   return `
-    <h2>Aufheben!</h2>
-    ${manual ? `<div class="card">${manual}</div>` : '<p class="small muted">Keine Einträge in „sammelliste“ (data.json).</p>'}
-    <h2>Noch offen für deine Builds</h2>
-    ${offen.length ? `<div class="card">${offen.map(o => `<div class="check"><span class="ct"><b>${esc(o.t)}</b><br>
-      <span class="small muted">${esc(o.s.de)} · ${esc(o.b.name)} (${o.rolle})</span></span></div>`).join('')}</div>`
-      : '<p class="small muted">Nichts offen – oder noch kein aktiver/Ziel-Build.</p>'}`;
+    <h2>Notizen</h2>${notizen}
+    <h2>Regeln</h2>${regeln}
+    <h2>Einträge</h2>
+    <div class="btn-row"><button class="btn" data-act="rohling" data-name="">+ Neuer Eintrag</button></div>
+    ${eintraege}
+    ${wissenLokal() ? '<div class="msg warn">Du hast das Wissen in der App geändert. Unter „Dateien“ exportieren, sonst gehen die Änderungen beim nächsten Wissens-Update verloren.</div>' : ''}`;
 }
 
-/* ---------------- Ansicht: Daten ---------------- */
+/* ---------- Eintrag-Editor (Rohling) ---------- */
 
-function viewDaten() {
-  const d = state.data;
-  const src = { datei: 'data/data.json (direkt gelesen)', cache: 'Zwischenspeicher (manuell geladene data.json)', leer: 'keine Daten geladen' }[state.dataSource] || '–';
-  const exportObj = { builds: state.builds, aktiverBuild: state.aktivId, zielBuild: state.zielId };
+function startEintragEditor(index, draft) {
+  state.eintragEditor = { index, draft: structuredClone(draft) };
+  render();
+  window.scrollTo(0, 0);
+}
+
+function viewEintragEditor() {
+  const { index, draft: e } = state.eintragEditor;
+  const verd = state.wissen.verdikte.map(v => `<option value="${esc(v.id)}" ${istVerdikt(v.id, e.verdikt) ? 'selected' : ''}>${esc(v.id)}</option>`).join('');
+  const selt = state.wissen.seltenheitSynonyme.map(s => `<option value="${esc(s.id)}" ${seltenheitKanon(e.seltenheit) === s.id ? 'selected' : ''}>${esc(bi(s.name_de, s.name_en))}</option>`).join('');
   return `
-    <h2>Datenquelle</h2>
-    <div class="kv small"><span class="k">Quelle:</span> ${esc(src)}<br>
-      <span class="k">Einträge:</span> ${d.eintraege.length} · <span class="k">Rezepte:</span> ${d.rezepte.length} ·
-      <span class="k">Farm-Ziele:</span> ${d.farmziele.length} · <span class="k">Sammelliste:</span> ${d.sammelliste.length}</div>
-    <div class="btn-row">
-      <label class="btn">data.json manuell laden<input type="file" id="file-data" accept=".json,application/json" hidden></label>
-      <button class="btn" data-act="reload">Neu laden</button>
-    </div>
-    <p class="small muted">Manuell geladene Daten werden im Browser zwischengespeichert und genutzt, falls data.json nicht direkt lesbar ist (z. B. beim Öffnen per Doppelklick).</p>
-
-    <h2>Builds sichern</h2>
-    <p class="small muted">Builds und Häkchen liegen im Browser (localStorage). Zum dauerhaften Sichern den Block unten in data.json bei „builds“, „aktiverBuild“, „zielBuild“ einsetzen.</p>
-    <div class="btn-row">
-      <button class="btn" data-act="export-dl">Als Datei herunterladen</button>
-      <button class="btn" data-act="export-copy">Kopieren</button>
-    </div>
-    <pre class="json" id="export-json">${esc(JSON.stringify(exportObj, null, 2))}</pre>
-
-    <h2>Builds importieren</h2>
-    <label class="f">JSON einfügen (Format wie oben, oder eine ganze data.json)<textarea id="import-json"></textarea></label>
-    <div class="btn-row">
-      <button class="btn" data-act="import-builds">Importieren (ersetzt Builds)</button>
-    </div>
-
-    <h2>Zurücksetzen</h2>
-    <div class="btn-row">
-      <button class="btn danger" data-act="reset-builds">Builds aus data.json neu übernehmen</button>
-      <button class="btn danger" data-act="reset-sammeln">Sammel-Häkchen löschen</button>
-    </div>`;
+    <h2>${index < 0 ? 'Neuer Eintrag (Rohling)' : 'Eintrag bearbeiten'}</h2>
+    <div class="msg info">Wird in der Arbeitskopie von wissen.json gespeichert. Zum Behalten unter „Dateien“ exportieren.</div>
+    <form id="eintrag-form" autocomplete="off">
+      <div class="grid2">
+        <label class="f">Name deutsch<input type="text" name="name_de" value="${esc(e.name_de)}"></label>
+        <label class="f">Name englisch<input type="text" name="name_en" value="${esc(e.name_en)}"></label>
+      </div>
+      <label class="f">Aliase (mit Komma)<input type="text" name="aliase" value="${esc(asArray(e.aliase).join(', '))}"></label>
+      <div class="grid2">
+        <label class="f">Typ<input type="text" name="typ" value="${esc(e.typ)}" placeholder="z. B. rune, zauber, item"></label>
+        <label class="f">Item-Typ<input type="text" name="itemTyp" value="${esc(e.itemTyp)}"></label>
+        <label class="f">Seltenheit<select name="seltenheit"><option value="">–</option>${selt}</select></label>
+        <label class="f">Verdikt<select name="verdikt"><option value="">– leer –</option>${verd}</select></label>
+      </div>
+      <label class="f">Begründung (eine Zeile)<input type="text" name="begruendung" value="${esc(e.begruendung)}"></label>
+      <div class="grid2">
+        <label class="f">Quelle<input type="text" name="quelle" value="${esc(typeof e.quelle === 'string' ? e.quelle : listText(e.quelle))}"></label>
+        <label class="f">Rezept-IDs (mit Komma)<input type="text" name="rezepte" value="${esc(asArray(e.rezepte).join(', '))}"></label>
+      </div>
+      <label class="f">Notiz<input type="text" name="notiz" value="${esc(e.notiz)}"></label>
+      <label class="f">Stand<input type="date" name="stand" value="${esc(e.stand || today())}"></label>
+      <div class="btn-row">
+        <button type="submit" class="btn primary">Speichern</button>
+        <button type="button" class="btn" data-act="eintrag-cancel">Abbrechen</button>
+        ${index >= 0 ? '<button type="button" class="btn danger" data-act="eintrag-del">Löschen</button>' : ''}
+      </div>
+    </form>`;
 }
 
-function applyImportedBuilds(obj) {
-  const builds = Array.isArray(obj) ? obj : obj.builds;
-  if (!Array.isArray(builds)) throw new Error('Kein „builds“-Array gefunden.');
-  state.builds = builds.map(normalizeBuild);
-  state.aktivId = (!Array.isArray(obj) && obj.aktiverBuild) || '';
-  state.zielId = (!Array.isArray(obj) && obj.zielBuild) || '';
-  if (!buildById(state.aktivId)) state.aktivId = state.builds[0] ? state.builds[0].id : '';
-  if (!buildById(state.zielId)) state.zielId = '';
-  saveBuilds();
-  buildIndex();
+function saveEintrag() {
+  const fd = new FormData($('#eintrag-form'));
+  const { index, draft } = state.eintragEditor;
+  const e = Object.assign({}, draft);
+  for (const k of ['name_de', 'name_en', 'typ', 'itemTyp', 'seltenheit', 'verdikt', 'begruendung', 'quelle', 'notiz', 'stand']) {
+    e[k] = String(fd.get(k) || '').trim();
+  }
+  e.aliase = String(fd.get('aliase') || '').split(',').map(x => x.trim()).filter(Boolean);
+  e.rezepte = String(fd.get('rezepte') || '').split(',').map(x => x.trim()).filter(Boolean);
+  if (!e.name_de && !e.name_en) { alert('Bitte mindestens einen Namen eintragen.'); return; }
+  if (index >= 0) state.wissen.eintraege[index] = e; else state.wissen.eintraege.push(e);
+  saveWissen(true);
+  state.eintragEditor = null;
+  state.query = e.name_en || e.name_de;
+  render();
 }
 
-/* ---------------- Events ---------------- */
+/* ================================================================
+   Ansicht: Abweichungen
+   ================================================================ */
+
+function viewAbweichungen() {
+  const list = state.profil.abweichungen;
+  const verd = state.wissen.verdikte.map(v => `<option value="${esc(v.id)}">${esc(v.id)}</option>`).join('');
+  const bezugOptionen = [
+    ...INDEX.filter(e => e.kind === 'eintrag').map(e => e.anzeige),
+    ...state.wissen.regeln.map(r => r.id),
+  ].map(x => `<option value="${esc(x)}">`).join('');
+  return `
+    <h2>Eigene Abweichungen</h2>
+    <p class="small muted">Hier überstimmst du das Wissen für dich persönlich. Gilt für einen Eintrag (Name) oder eine Regel (ID).
+      Wird in profil.json gespeichert und bei Wissens-Updates nie überschrieben. Build-Bedarf hat trotzdem Vorrang (BEHALTEN).</p>
+    ${list.length ? list.map((a, i) => `<div class="card">
+      <div class="res-head">${verdiktHtml(a.verdikt)} <span class="res-name">${esc(a.bezug)}</span> ${staleIcon(a.stand)}</div>
+      ${a.begruendung ? `<p class="res-reason">${esc(a.begruendung)}</p>` : ''}
+      <div class="small muted">${a.stand ? `Stand ${esc(a.stand)}` : ''}</div>
+      <div class="btn-row"><button class="btn danger" data-act="abw-del" data-i="${i}">Löschen</button></div>
+    </div>`).join('') : '<p class="small muted">Noch keine Abweichungen.</p>'}
+    <h3>Neue Abweichung</h3>
+    <form id="abw-form" class="card" autocomplete="off">
+      <label class="f">Bezug (Eintragsname oder Regel-ID)<input type="text" name="bezug" list="dl-bezug" required></label>
+      <label class="f">Mein Verdikt<select name="verdikt">${verd}</select></label>
+      <label class="f">Warum<input type="text" name="begruendung"></label>
+      <datalist id="dl-bezug">${bezugOptionen}</datalist>
+      <button type="submit" class="btn primary">Hinzufügen</button>
+    </form>`;
+}
+
+/* ================================================================
+   Ansicht: Dateien (Import/Export, Profil-Einstellungen)
+   ================================================================ */
+
+function viewDateien() {
+  const w = state.wissen, p = state.profil;
+  const charFelder = Object.keys(p.charakter).length ? Object.keys(p.charakter) : ['name', 'klasse', 'stufe', 'notiz'];
+  return `
+    <h2>wissen.json <span class="muted small">Spielwissen</span></h2>
+    <div class="kv small">
+      <span class="k">Quelle:</span> ${esc(state.wissenQuelle)}<br>
+      <span class="k">Schema:</span> ${esc(w.schemaVersion ?? '–')} · <span class="k">Version:</span> ${esc(w.version || '–')} · <span class="k">Stand:</span> ${esc(w.stand || '–')} ${staleIcon(w.stand)}<br>
+      ${w.eintraege.length} Einträge · ${w.regeln.length} Regeln · ${w.rezepte.length} Rezepte · ${w.farmziele.length} Farmziele · ${w.notizen.length} Notizen · ${w.quellen.length} Quellen
+      ${wissenLokal() ? '<br><b class="warn-text">In der App geändert – noch nicht exportiert?</b>' : ''}
+    </div>
+    <div class="btn-row">
+      <button class="btn" data-act="export-wissen">wissen.json exportieren</button>
+      <label class="btn">wissen.json importieren (ersetzt komplett)<input type="file" id="file-wissen" accept=".json,application/json" hidden></label>
+      <button class="btn danger" data-act="wissen-neu">Aus Datei im Repo neu laden</button>
+    </div>
+
+    <h2>profil.json <span class="muted small">persönlich</span></h2>
+    <div class="kv small">
+      <span class="k">Quelle:</span> ${esc(state.profilQuelle)} · <span class="k">Schema:</span> ${esc(p.schemaVersion ?? '–')}<br>
+      ${p.builds.length} Builds · ${p.sammelliste.length} auf der Sammelliste · ${p.offeneAufgaben.length} Aufgaben · ${p.abweichungen.length} Abweichungen
+    </div>
+    <div class="btn-row">
+      <button class="btn" data-act="export-profil">profil.json exportieren</button>
+      <label class="btn">profil.json importieren (ersetzt dein Profil)<input type="file" id="file-profil" accept=".json,application/json" hidden></label>
+      <button class="btn danger" data-act="profil-leer">Profil zurücksetzen (profil-leer.json)</button>
+    </div>
+
+    <h2>Charakter &amp; Einstellungen</h2>
+    <form id="profil-form" class="card" autocomplete="off">
+      <div class="grid2">
+        ${charFelder.map(k => `<label class="f">${esc(k)}<input type="text" name="c.${esc(k)}" value="${esc(p.charakter[k] ?? '')}"></label>`).join('')}
+      </div>
+      <label class="f">Warnung ab wie vielen Tagen (Builds und Wissen)<input type="text" inputmode="numeric" name="warnTage" value="${esc(p.einstellungen.warnTageBuildAlter)}"></label>
+      <button type="submit" class="btn primary">Speichern</button>
+    </form>
+    <p class="small muted">Beide Dateien werden als Arbeitskopie im Browser gehalten. Exportierte Dateien kannst du nach <code>data/</code> ins Repo legen.</p>`;
+}
+
+/* ================================================================
+   Events
+   ================================================================ */
+
+function readFileJson(input, cb) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  file.text().then(txt => {
+    let obj;
+    try { obj = JSON.parse(txt); } catch (err) { alert('Datei ist kein gültiges JSON: ' + err.message); return; }
+    cb(obj);
+  }).finally(() => { input.value = ''; });
+}
+
+function schemaHinweis(obj, name) {
+  return obj.schemaVersion === SCHEMA ? '' : `\n\nAchtung: ${name} hat schemaVersion ${obj.schemaVersion ?? 'fehlt'}, erwartet wird ${SCHEMA}.`;
+}
+
+function refreshSchemaMeldung() {
+  state.meldungen = state.meldungen.filter(m => !m.text.startsWith('Schema passt nicht'));
+  pruefeSchema();
+}
 
 document.addEventListener('click', e => {
   const tabBtn = e.target.closest('#tabs button');
   if (tabBtn) { setTab(tabBtn.dataset.tab); return; }
+  if (e.target.closest('#btn-dateien')) {
+    state.dateienOpen = !state.dateienOpen; state.editor = null; state.eintragEditor = null;
+    render(); window.scrollTo(0, 0); return;
+  }
 
   const el = e.target.closest('[data-act]');
   if (!el || el.type === 'checkbox') return;
   const act = el.dataset.act;
+  const p = state.profil;
   const id = el.dataset.id;
   const b = id ? buildById(id) : null;
 
   switch (act) {
-    case 'new':
-      startEditor({ datum: today() }, true); break;
-    case 'open-import':
-      state.importOpen = true; render(); break;
+    case 'msg-x':
+      state.meldungen.splice(+el.dataset.i, 1); renderHeader(); break;
+    case 'wissen-uebernehmen':
+      if (!state.neueWissenDatei || !confirm('Neue wissen.json übernehmen? Deine Änderungen am Wissen in der App gehen verloren.')) return;
+      state.wissen = normalizeWissen(state.neueWissenDatei.data);
+      lsSet(LS.wissen, state.neueWissenDatei.data); lsSet(LS.wissenBasis, state.neueWissenDatei.hash); lsDel(LS.wissenLokal);
+      state.neueWissenDatei = null;
+      state.meldungen = state.meldungen.filter(m => !m.aktion);
+      state.wissenQuelle = FILES.wissen;
+      buildIndex(); refreshSchemaMeldung(); render(); break;
+
+    /* Builds */
+    case 'new': startEditor({ datum: today() }, true); break;
+    case 'open-import': state.importOpen = true; render(); break;
     case 'cancel':
       if (state.editor && state.editor.preview && !confirm('Vorschau verwerfen?')) return;
       state.editor = null; state.importOpen = false; render(); break;
-    case 'edit':
-      startEditor(b, false); break;
+    case 'edit': startEditor(b, false); break;
     case 'dup': {
       const c = structuredClone(b);
       c.id = newId(); c.name = b.name + ' (Kopie)';
-      state.builds.push(c); saveBuilds(); buildIndex(); render(); break;
+      p.builds.push(c); saveProfil(); buildIndex(); render(); break;
     }
     case 'del':
       if (!confirm(`Build „${b.name}“ löschen?`)) return;
-      state.builds = state.builds.filter(x => x.id !== id);
-      if (state.aktivId === id) state.aktivId = '';
-      if (state.zielId === id) state.zielId = '';
-      saveBuilds(); buildIndex(); render(); break;
-    case 'set-aktiv':
-      state.aktivId = id; saveBuilds(); render(); break;
-    case 'set-ziel':
-      state.zielId = id; saveBuilds(); render(); break;
-    case 'unset-ziel':
-      state.zielId = ''; saveBuilds(); render(); break;
+      p.builds = p.builds.filter(x => x.id !== id);
+      if (p.aktiverBuild === id) p.aktiverBuild = '';
+      if (p.zielBuild === id) p.zielBuild = '';
+      saveProfil(); buildIndex(); render(); break;
+    case 'set-aktiv': p.aktiverBuild = id; saveProfil(); render(); break;
+    case 'set-ziel': p.zielBuild = id; saveProfil(); render(); break;
+    case 'unset-ziel': p.zielBuild = ''; saveProfil(); render(); break;
     case 'parse': {
       const text = $('#imp-text').value;
       if (!text.trim()) { alert('Bitte zuerst Guide-Text einfügen.'); return; }
       const r = parseGuide(text);
-      const name = $('#imp-name').value.trim() || r.firstLine.slice(0, 60);
       startEditor({
-        name, datum: $('#imp-datum').value || today(),
+        name: $('#imp-name').value.trim() || r.firstLine.slice(0, 60),
+        datum: $('#imp-datum').value || today(),
         quelleUrl: $('#imp-url').value.trim() || r.url,
         slots: r.slots,
       }, true, { preview: true, unassigned: r.unassigned, erkannt: r.erkannt });
@@ -1001,9 +1589,7 @@ document.addEventListener('click', e => {
       const have = new Set(ta.value.split('\n').map(norm).filter(Boolean));
       const add = [];
       for (const s of SLOTS) {
-        const item = $(`[name="${s.key}.zielItem"]`).value.trim();
-        const asp = $(`[name="${s.key}.zielAspekt"]`).value.trim();
-        const t = item || asp;
+        const t = $(`[name="${s.key}.zielItem"]`).value.trim() || $(`[name="${s.key}.zielAspekt"]`).value.trim();
         if (!t) continue;
         const line = `${s.de}: ${t}`;
         if (!have.has(norm(line))) add.push(line);
@@ -1011,78 +1597,148 @@ document.addEventListener('click', e => {
       ta.value = [ta.value.trim(), ...add].filter(Boolean).join('\n');
       break;
     }
-    case 'reload':
-      location.reload(); break;
-    case 'export-dl': {
-      const blob = new Blob([$('#export-json').textContent], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `d4-builds-${today()}.json`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+
+    /* Sammelliste / Aufgaben */
+    case 'sammel-del': p.sammelliste.splice(+el.dataset.i, 1); saveProfil(); buildIndex(); render(); break;
+    case 'aufgabe-del': p.offeneAufgaben.splice(+el.dataset.i, 1); saveProfil(); render(); break;
+
+    /* Wissen-Einträge */
+    case 'rohling': {
+      const name = el.dataset.name || '';
+      startEintragEditor(-1, {
+        name_de: '', name_en: name, aliase: [], typ: '', itemTyp: '', seltenheit: '', verdikt: '',
+        begruendung: '', quelle: '', rezepte: [], notiz: '', stand: today(),
+      });
       break;
     }
-    case 'export-copy':
-      navigator.clipboard?.writeText($('#export-json').textContent)
-        .then(() => { el.textContent = 'Kopiert ✓'; }, () => alert('Kopieren nicht möglich – bitte manuell markieren.'));
+    case 'eintrag-edit': startEintragEditor(+el.dataset.i, state.wissen.eintraege[+el.dataset.i]); break;
+    case 'eintrag-cancel': state.eintragEditor = null; render(); break;
+    case 'eintrag-del': {
+      const i = state.eintragEditor.index;
+      if (!confirm('Eintrag aus dem Wissen löschen?')) return;
+      state.wissen.eintraege.splice(i, 1);
+      saveWissen(true); state.eintragEditor = null; render(); break;
+    }
+
+    /* Abweichungen */
+    case 'abw-del': p.abweichungen.splice(+el.dataset.i, 1); saveProfil(); render(); break;
+
+    /* Dateien */
+    case 'export-wissen':
+      download('wissen.json', state.wissen);
+      lsDel(LS.wissenLokal);
+      render(); break;
+    case 'export-profil': download('profil.json', state.profil); break;
+    case 'wissen-neu':
+      if (wissenLokal() && !confirm('Arbeitskopie verwerfen und wissen.json aus dem Repo neu laden? Änderungen in der App gehen verloren.')) return;
+      lsDel(LS.wissen); lsDel(LS.wissenBasis); lsDel(LS.wissenLokal);
+      location.reload(); break;
+    case 'profil-leer':
+      if (!confirm('Dein Profil (Builds, Häkchen, Listen, Abweichungen) löschen und aus profil-leer.json neu anlegen? Vorher exportieren!')) return;
+      fetchJson(FILES.profilLeer).then(r => {
+        state.profil = normalizeProfil(r.ok ? r.data : { schemaVersion: SCHEMA });
+        state.profilQuelle = r.ok ? `neu aus ${FILES.profilLeer}` : 'neues leeres Profil';
+        saveProfil(); buildIndex(); refreshSchemaMeldung(); render();
+      });
       break;
-    case 'import-builds':
-      try {
-        applyImportedBuilds(JSON.parse($('#import-json').value));
-        alert(`${state.builds.length} Build(s) importiert.`); render();
-      } catch (err) { alert('Import fehlgeschlagen: ' + err.message); }
-      break;
-    case 'reset-builds':
-      if (!confirm('Alle Builds im Browser durch die aus data.json ersetzen? Häkchen gehen verloren.')) return;
-      state.builds = structuredClone(state.data.builds);
-      state.aktivId = buildById(state.data.aktiverBuild) ? state.data.aktiverBuild : '';
-      state.zielId = buildById(state.data.zielBuild) ? state.data.zielBuild : '';
-      saveBuilds(); buildIndex(); render(); break;
-    case 'reset-sammeln':
-      if (!confirm('Alle Sammel-Häkchen löschen?')) return;
-      state.sammelDone = {}; lsSet(LS.sammeln, {}); render(); break;
   }
 });
 
 document.addEventListener('change', e => {
   const el = e.target;
-  if (el.id === 'ziel-select') { state.zielViewId = el.value; render(); return; }
-  if (el.id === 'file-data') {
-    const file = el.files && el.files[0];
-    if (!file) return;
-    file.text().then(txt => {
-      const obj = JSON.parse(txt);
-      lsSet(LS.dataCache, { zeit: Date.now(), data: obj });
-      state.dataSource = 'cache';
-      state.dataError = '';
-      applyData(obj);
-      render();
-      alert('data.json geladen.');
-    }).catch(err => alert('Datei ist kein gültiges JSON: ' + err.message));
+  if (el.id === 'file-wissen') {
+    readFileJson(el, obj => {
+      if (!confirm('wissen.json komplett ersetzen?' + schemaHinweis(obj, 'Die Datei'))) return;
+      state.wissen = normalizeWissen(obj);
+      lsSet(LS.wissen, obj); lsDel(LS.wissenLokal);
+      state.wissenQuelle = 'importierte Datei';
+      buildIndex(); refreshSchemaMeldung(); render();
+    });
+    return;
+  }
+  if (el.id === 'file-profil') {
+    readFileJson(el, obj => {
+      if (!confirm('Dein Profil durch diese Datei ersetzen?' + schemaHinweis(obj, 'Die Datei'))) return;
+      state.profil = normalizeProfil(obj);
+      state.profilQuelle = 'importierte Datei';
+      saveProfil(); buildIndex(); refreshSchemaMeldung(); render();
+    });
     return;
   }
   if (el.type !== 'checkbox' || !el.dataset.act) return;
+  const p = state.profil;
   const b = buildById(el.dataset.id);
   switch (el.dataset.act) {
-    case 'wk':
-      b.wechselkriterien[+el.dataset.i].erledigt = el.checked; saveBuilds(); break;
-    case 'slot-done':
-      b.slots[el.dataset.slot].erledigt = el.checked; saveBuilds(); break;
-    case 'sammel':
-      if (el.checked) state.sammelDone[el.dataset.k] = true; else delete state.sammelDone[el.dataset.k];
-      lsSet(LS.sammeln, state.sammelDone); break;
+    case 'wk': b.wechselkriterien[+el.dataset.i].erledigt = el.checked; break;
+    case 'slot-done': b.slots[el.dataset.slot].erledigt = el.checked; break;
+    case 'sammel': p.sammelliste[+el.dataset.i].erledigt = el.checked; break;
+    case 'aufgabe': p.offeneAufgaben[+el.dataset.i].erledigt = el.checked; break;
+    default: return;
   }
-  render();
+  saveProfil();
+  el.closest('.check')?.classList.toggle('done', el.checked);
+  if (el.dataset.act === 'wk' || el.dataset.act === 'slot-done') render();
 });
 
 document.addEventListener('submit', e => {
-  if (e.target.id === 'build-form') { e.preventDefault(); saveEditor(); }
+  const f = e.target;
+  e.preventDefault();
+  const p = state.profil;
+  if (f.id === 'build-form') { saveEditor(); return; }
+  if (f.id === 'eintrag-form') { saveEintrag(); return; }
+  if (f.id === 'abw-form') {
+    const fd = new FormData(f);
+    const bezug = String(fd.get('bezug') || '').trim();
+    if (!bezug) return;
+    // Anzeige "DE (EN)" auf einen Namen reduzieren, damit der Vergleich greift
+    const hit = INDEX.find(x => x.kind === 'eintrag' && x.anzeige === bezug);
+    p.abweichungen.push({
+      bezug: hit ? (hit.src.name_en || hit.src.name_de) : bezug,
+      verdikt: String(fd.get('verdikt') || ''),
+      begruendung: String(fd.get('begruendung') || '').trim(),
+      stand: today(),
+    });
+    saveProfil(); render(); return;
+  }
+  if (f.id === 'profil-form') {
+    const fd = new FormData(f);
+    for (const [k, v] of fd.entries()) if (k.startsWith('c.')) p.charakter[k.slice(2)] = String(v).trim();
+    const n = parseInt(fd.get('warnTage'), 10);
+    if (n > 0) p.einstellungen.warnTageBuildAlter = n;
+    saveProfil(); render(); return;
+  }
+  const art = f.dataset.form;
+  const text = String(new FormData(f).get('text') || '').trim();
+  if (!text) return;
+  if (art === 'sammel-add') {
+    // "Deutsch / Englisch" oder "Deutsch (Englisch)" aufteilen
+    const m = text.match(/^(.+?)\s*(?:\/|\()\s*(.+?)\)?$/);
+    p.sammelliste.push({ name_de: m ? m[1] : text, name_en: m ? m[2] : '', notiz: '', erledigt: false });
+    saveProfil(); buildIndex(); render();
+    $(`[data-form="sammel-add"] input`)?.focus();
+  } else if (art === 'aufgabe-add') {
+    p.offeneAufgaben.push({ text, erledigt: false });
+    saveProfil(); render();
+  }
 });
 
-/* ---------------- Start ---------------- */
+/* ================================================================
+   Start
+   ================================================================ */
 
 (async function init() {
-  state.tab = lsGet(LS.tab, 'suche') || 'suche';
-  await loadData();
+  state.tab = 'suche';   // Startseite ist immer die Suche
+  try {
+    await loadWissen();
+    await loadProfil();
+    pruefeSchema();
+    buildIndex();
+  } catch (err) {
+    console.error(err);
+    state.wissen = state.wissen || normalizeWissen({});
+    state.profil = state.profil || normalizeProfil({});
+    state.meldungen.push({ art: 'err', text: 'Fehler beim Laden: ' + err.message });
+    try { buildIndex(); } catch { /* leerer Index */ }
+  }
   render();
 })();

@@ -1,0 +1,19 @@
+{
+  "_info": "Leeres Profil – Vorlage. Die App legt daraus beim ersten Start dein Profil an.",
+  "schemaVersion": 2,
+  "charakter": {
+    "name": "",
+    "klasse": "",
+    "stufe": "",
+    "notiz": ""
+  },
+  "einstellungen": {
+    "warnTageBuildAlter": 14
+  },
+  "builds": [],
+  "aktiverBuild": "",
+  "zielBuild": "",
+  "sammelliste": [],
+  "offeneAufgaben": [],
+  "abweichungen": []
+}
