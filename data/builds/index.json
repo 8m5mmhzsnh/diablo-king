@@ -1,0 +1,20 @@
+{
+  "_info": "Liste der Build-Vorlagen für den Import in der App (Builds → Build-Vorlage importieren).",
+  "vorlagen": [
+    {
+      "datei": "build-starter.json",
+      "name": "Starter",
+      "beschreibung": "Umkreisender Schrei (Orbital Scream) profitiert nicht von Angriffsgeschwindigkeit. Der Brutale Aspekt wandelt sie deshalb in Schaden um – laut Guide 250–300%. D"
+    },
+    {
+      "datei": "build-midgame.json",
+      "name": "Midgame",
+      "beschreibung": "Wechsel auf Schädelspalter und Metamorphose: Zerstörungsdämon. Leben stapeln, weil Metamorphose den Schaden über das maximale Leben skaliert. Erst wechseln, wen"
+    },
+    {
+      "datei": "build-endgame.json",
+      "name": "Endgame",
+      "beschreibung": "Mythische Versionen aller Uniques. Enigma statt Stealth, Hand der Apotheose, Stein von Jordan. Feuerwiderstand stapeln für Stone of Jordan."
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 Persönlicher Diablo-4-Spickzettel: Namen oder Kategorie eintippen, zum Beispiel „Nagu“, „gelbe Rune“ oder „rare ring“. Die App zeigt sofort ein Verdikt, etwa **BEHALTEN**, **WÜRFELN**, **ZERLEGEN**, **VERWERTEN**, **VERKAUFEN** oder **ANLEGEN**.
 
-Reines HTML/CSS/JS, kein Build-Schritt. Einzige externe Abhängigkeit ist die Texterkennung, und die wird erst beim ersten Screenshot geladen.
+Reines HTML/CSS/JS, kein Build-Schritt, keine Ladung von CDNs zur Laufzeit. Auch die Texterkennung liegt im Repo (`vendor/tesseract/`, 11 MB).
 
 ## Starten
 
@@ -12,13 +12,26 @@ Reines HTML/CSS/JS, kein Build-Schritt. Einzige externe Abhängigkeit ist die Te
 | Aufs Handy | Gleicher Befehl auf dem PC, dann am Handy `http://<IP-des-PCs>:8000` (gleiches WLAN). Oder das Repo über GitHub Pages veröffentlichen. |
 | Doppelklick auf `index.html` | Der Browser blockiert dann das Lesen der JSON-Dateien. Unter **⚙ Dateien** einmal `wissen.json` und `profil.json` von Hand importieren. |
 
+## Für weitere Nutzer
+
+1. Dieselbe URL öffnen: **https://8m5mmhzsnh.github.io/diablo-king/**
+2. Die App legt beim ersten Start **dein eigenes Profil** im Browser an, aus `data/profil-leer.json`. Nichts von anderen Nutzern wird übernommen.
+3. Unter **Builds → Build-Vorlage importieren** eine der Vorlagen laden (Starter, Midgame, Endgame aus `data/builds/`) und als aktiv bzw. Ziel markieren.
+4. Unter **Bestand** deine Materialmengen eintragen und unter **⚙ Dateien** Qualstufe und Paragon.
+
+**`profil.json` liegt nie im Repo.** Sie steht in `.gitignore`, und jeder hat seine eigene.
+Die App hält dein Profil im Browser des jeweiligen Geräts. Zum Sichern oder für ein zweites Gerät: **⚙ Dateien → profil.json exportieren** bzw. **importieren**.
+Lokal (eigener Webserver) liest die App beim allerersten Start eine vorhandene `data/profil.json`, sonst `profil-leer.json`.
+
 ## Die zwei Dateien (Schema 2)
 
 | Datei | Inhalt | Verhalten |
 |---|---|---|
 | `data/wissen.json` | Spielwissen, für alle gleich: `eintraege`, `regeln`, `rezepte`, `farmziele`, `notizen`, `verdikte`, `seltenheitSynonyme`, `quellen` | Wird bei einem Update **komplett ersetzt**. |
-| `data/profil.json` | Persönliches: `charakter`, `einstellungen`, `builds`, `aktiverBuild`, `zielBuild`, `sammelliste`, `offeneAufgaben`, `abweichungen` | Wird **nie** überschrieben. |
+| `data/profil.json` | Persönliches: `charakter`, `einstellungen`, `builds`, `aktiverBuild`, `zielBuild`, `sammelliste`, `offeneAufgaben`, `abweichungen`, `bestand`, `inventar` | Wird **nie** überschrieben. **Nicht im Repo** (`.gitignore`). |
 | `data/profil-leer.json` | Leeres Profil als Vorlage | Daraus entsteht beim ersten Start ein Profil, wenn es keine `profil.json` gibt. |
+| `data/katalog.json` | Namenskatalog (Uniques, Aspekte, Item-Typen, Affixe …), abgeleitet aus d4lf (MIT) | Vorschlagslisten und Namensprüfung im Item-Editor. |
+| `data/builds/*.json` | Build-Vorlagen `{ "build": { … } }`, Liste in `data/builds/index.json` | Import unter **Builds → Build-Vorlage importieren**. |
 
 Beide Dateien haben `schemaVersion` (aktuell `2`). Passen sie nicht zueinander oder nicht zur App, erscheint oben ein Hinweis. Die App läuft trotzdem weiter.
 `wissen.json` hat zusätzlich `version` und `stand`. Beides steht klein in der Kopfzeile.
@@ -101,7 +114,7 @@ Ist der Stand älter als `profil.einstellungen.warnTageBuildAlter`, erscheint �
   "einstellungen": { "warnTageBuildAlter": 14 },
   "builds": [{
     "id": "", "name": "", "klasse": "", "quelleUrl": "", "datum": "YYYY-MM-DD", "notiz": "",
-    "slots": {   // kopf, brust, haende, beine, fuesse, amulett, ring1, ring2, waffe, fokus
+    "slots": {   // kopf, brust, handschuhe, hose, stiefel, amulett, ring1, ring2, waffe, fokus
       "kopf": { "zielItem": "", "zielAspekt": "", "sockel": "", "affixe": [], "haertung": "", "quelle": "", "erledigt": false }
     },
     "wechselkriterien": [{ "text": "", "erledigt": false }]
@@ -119,25 +132,41 @@ Ist der Stand älter als `profil.einstellungen.warnTageBuildAlter`, erscheint �
 
 **Item erfassen:**
 - Screenshot eines Tooltips einfügen: auf die Karte tippen und Bild wählen, Strg+V drücken oder das Bild hineinziehen. Alternativ „Manuell erfassen“.
-- Die Texterkennung ([Tesseract.js](https://github.com/naptha/tesseract.js)) läuft komplett im Browser. Beim ersten Screenshot lädt die App sie von cdn.jsdelivr.net, dafür braucht es einmal Internet.
-- Die App schlägt einen Slot vor (aus dem Item-Typ oder `katalog.json`), du bestätigst ihn.
+- Die Texterkennung ([Tesseract.js](https://github.com/naptha/tesseract.js) 5.1.1) läuft komplett im Browser und liegt lokal in `vendor/tesseract/`:
+  - Loader und Worker: 67 KB + 124 KB
+  - zwei Kerne (mit und ohne SIMD): je 3,9 MB
+  - englische Sprachdaten: 2,95 MB
+  - **zusammen 11,0 MB im Repo**
+
+  Der Browser lädt beim ersten Screenshot nur einen Kern plus Sprachdaten, rund 7 MB, danach kommt alles aus dem Cache. Details in `vendor/tesseract/README.md`.
+- Die App schlägt einen Slot vor (aus dem Eintrag in `wissen.json`, sonst aus dem Item-Typ), du bestätigst ihn.
 - Alle erkannten Felder erscheinen zur Korrektur. Affixzeilen haben eine Konfidenz und lassen sich einzeln bearbeiten, hinzufügen und löschen.
 - **Erst „Übernehmen“ schreibt ins Inventar.** Die Analyse sieht nie den rohen Erkennungstext.
-- Bei Uniques werden die ersten `num_inherents` Zeilen (aus `data/katalog.json`) als implizit vormarkiert. Das ist ein Hinweis, du kannst es umschalten.
+- Name, Aspekt, Item-Typ und Affixe haben Vorschlagslisten aus `katalog.json`. Steht ein Affix nicht im Katalog, schlägt die App den ähnlichsten Namen vor.
+- Bei Uniques werden die ersten `num_inherents` Zeilen als implizit vormarkiert, sofern der Katalog dieses Feld hat. Der aktuelle Katalog hat es nicht, deshalb markierst du implizite Affixe selbst.
 
 **Slot-Analyse:** Pro Slot vergleicht die App das Item mit dem aktiven und dem Ziel-Build. Heraus kommen konkrete Handlungen mit Begründung und Priorität:
-- **Ersetzen:** mit Quelle aus `wissen.uniqueQuellen` bzw. `farmziele`
+- **Ersetzen:** mit Quelle aus `eintraege[].quelle`, dazu jedes `farmziele`-Element, dessen `quelle_de`/`quelle_en` dort vorkommt oder das Item als Belohnung nennt, mit Kosten und Belohnungen
 - **Aspekt überprägen**
-- **Sockeln:** einsetzen, ersetzen oder Sockel hinzufügen (kostet 1 Zerstreutes Prisma)
+- **Sockeln:** einsetzen, ersetzen oder Sockel hinzufügen (kostet ein Prisma)
 - **Verzaubern:** schlechteste Zeile auf den obersten fehlenden Zielaffix umrollen, mit Pflicht-Warnung „nur EIN Affix“
 - **Rezept `reroll-affixwerte`:** wenn du Werte als schwach markiert hast
-- **Härten:** nur bei Keepern, Warnung ohne Schriftrolle der Wiederherstellung
+- **Härten:** nur bei Keepern, Warnung, wenn der Bestand an Schriftrollen der Wiederherstellung unbekannt oder 0 ist
 - **Vollenden:** nur Keeper und ab Qual 4
 
-Sind mehrere Aktionen offen, zeigt die App die Bearbeitungsreihenfolge. Sie kommt aus der Notiz `item-reihenfolge` (Feld `reihenfolge`) und verlinkt auf diese Notiz.
+Sind mehrere Aktionen offen, zeigt die App die Bearbeitungsreihenfolge und verlinkt auf die Notiz „In welcher Reihenfolge bearbeite ich ein Item?“. Die Reihenfolge nimmt sie aus dem optionalen Feld `reihenfolge` dieser Notiz, sonst gilt die Standardreihenfolge: Affixe, Sockel, Aspekt, Härten, Vollenden, Transfigurieren.
+
+**Materialien kommen aus den Daten, nicht aus dem Code.**
+- Einträge in `wissen.json` mit `bestandsschluessel` sind Materialien. Der Anzeigename kommt aus `name_de`/`name_en`, die Menge aus `profil.bestand[bestandsschluessel]`.
+- Fehlt der Schlüssel oder ist er `null`, gilt der Bestand als **unbekannt**, und Warnungen erscheinen.
+- Jede Aktion mit Material zeigt den Bestand an, z. B. „braucht 1 Zerstreutes Prisma (Scattered Prism), du hast 0“.
+- Reicht der Bestand nicht, wird die Aktion als **blockiert** markiert und nach unten sortiert, aber nicht versteckt.
+- Im Code steht nur, welche Aktion welchen `bestandsschluessel` braucht: Sockel hinzufügen → `Scattered Prism`, Vollenden → `Obducite`, Verzaubern vermachter Items → `Forgotten Souls`, Härtung zurücksetzen → `Scroll of Restoration`.
+
+**Reiter „Bestand“:** Hier bearbeitest du die Mengen direkt. Gespeichert wird in `profil.bestand`; ein leeres Feld bedeutet unbekannt.
 
 **Reiter „Nächster Schritt“:** Alle Aktionen nach Priorität, gruppiert in „kostet nur Gold“, „braucht knappe Materialien“ und „beschaffen“.
-Material-Engpässe kommen aus `wissen.engpaesse`. Fehlt das Feld, leitet die App sie aus Einträgen mit `typ: "material"` ab. Darunter stehen die Wechselkriterien des Ziel-Builds und die offenen Aufgaben.
+Engpässe sind Materialien mit `engpass: true`. Falls es eine Sektion `wissen.engpaesse` gibt, hat sie Vorrang; fehlen beide, gelten alle Einträge mit `typ: "material"`. Aktionen mit Engpass-Material sind hervorgehoben. Darunter stehen die Wechselkriterien des Ziel-Builds und die offenen Aufgaben.
 
 **Grenzen, bewusst:**
 - Keine Werte-Vergleiche gegen Roll-Bereiche. Es gibt keine Min-/Max-Datenbank.
@@ -158,21 +187,23 @@ Material-Engpässe kommen aus `wissen.engpaesse`. Fehlt das Feld, leitet die App
     "vollendung": { "stufe": 0, "max": 25 },
     "stand": "YYYY-MM-DD", "quelle": "ocr"            // oder "manuell"
   }
-  // … kopf, brust, haende, beine, fuesse, amulett, ring1, ring2, fokus (null = leer)
+  // … kopf, brust, handschuhe, hose, stiefel, amulett, ring1, ring2, fokus (null = leer)
 },
-"bestand": { "Schriftrolle der Wiederherstellung": 0 }   // leer/fehlend = unbekannt
+"bestand": { "Scattered Prism": 0, "Obducite": 873 }   // Schlüssel = bestandsschluessel aus wissen.json; fehlend/null = unbekannt
 ```
 
 `aspekt` (der geprägte Aspekt) und `schwach` (Wert schwach, ohne Roll-Datenbank von dir gesetzt) sind Ergänzungen.
 Die Analyse braucht sie für „Aspekt überprägen“ und das Rezept `reroll-affixwerte`.
 
-**Neue Felder in `wissen.json`:**
-- `uniqueQuellen`: `[{ "slug", "name_de", "name_en", "quelle" | "quellen": [] }]`
-- optional `engpaesse`: `["Obduzit", …]`
+**Genutzte Felder in `wissen.json`:**
+- `eintraege[].bestandsschluessel`, `.engpass`, `.slot`, `.schwelle`, `.kategorie`, `.quelle`
+- `regeln[].rezepte`, `.schwelle`
 - das Rezept `reroll-affixwerte`
-- die Notiz `item-reihenfolge`
+- die Notiz „In welcher Reihenfolge bearbeite ich ein Item?“
+- `verdikte[].farbe`: Farbnamen wie `gruen`, `violett`, `blau`, `tuerkis`, `grau`, `gold` oder Hex-Werte
 
-**`data/katalog.json`:** `{ "uniques": [{ "slug", "name_de", "name_en", "itemTyp", "slot", "num_inherents" }] }`. Wird ausgeliefert, aber leer.
+**`data/katalog.json`:** `{ "kategorien": { "uniques": { "typ", "anzahl", "einträge": [{ "slug", "name_en", "name_quelle" }] }, … } }`.
+Die Vorschlagslisten nutzen `uniques`, `aspekte`, `itemTypen` und `affixe`.
 
 ## Tests
 
@@ -184,14 +215,15 @@ npm test        # = node --test, prüft Slot-Analyse und Tooltip-Parser (lib.js)
 
 - **Suche** (Startseite): großes Suchfeld, darunter die Sammelliste
 - **Builds**: anlegen, bearbeiten, aktiv/Ziel setzen, Guide-Text importieren, Wechselkriterien
-- **Inventar**: Items per Screenshot oder von Hand erfassen, Analyse pro Slot, Material-Bestand
+- **Inventar**: Items per Screenshot oder von Hand erfassen, Analyse pro Slot
+- **Bestand**: Materialmengen bearbeiten
 - **Nächster Schritt**: alle Aktionen nach Priorität, Engpässe, Wechselkriterien, Aufgaben
 - **Checkliste**: Slots des aktiven Builds mit Quelle und Häkchen, Wechselkriterien des Ziel-Builds, offene Aufgaben
 - **Rezepte**: Horadrimwürfel
-- **Farmziele**: Farmziele und Quellen
+- **Farmziele**: Bosse und Aktivitäten mit Kosten und Belohnungen, dazu die Wissensquellen
 - **Wissen**: alle Notizen (Frage als Titel), Regeln, Einträge bearbeiten
-- **Abweichungen**: eigene Verdikte, die das Wissen überstimmen
-- **⚙ Dateien**: Import und Export beider Dateien, Charakter, Einstellungen
+- **Abweichungen**: Guide-Abweichungen (`thema`, je Quelle, `entscheidung`) und eigene Verdikte (`bezug`, `verdikt`), die das Wissen überstimmen
+- **⚙ Dateien**: Import und Export beider Dateien, Integritätsprüfung, Charakter, Einstellungen
 
 ## Guide-Text importieren
 

@@ -8,9 +8,9 @@
 const SLOTS = [
   { key: 'kopf', de: 'Kopf', en: 'Helm' },
   { key: 'brust', de: 'Brust', en: 'Chest' },
-  { key: 'haende', de: 'Handschuhe', en: 'Gloves' },
-  { key: 'beine', de: 'Hose', en: 'Pants' },
-  { key: 'fuesse', de: 'Stiefel', en: 'Boots' },
+  { key: 'handschuhe', de: 'Handschuhe', en: 'Gloves' },
+  { key: 'hose', de: 'Hose', en: 'Pants' },
+  { key: 'stiefel', de: 'Stiefel', en: 'Boots' },
   { key: 'amulett', de: 'Amulett', en: 'Amulet' },
   { key: 'ring1', de: 'Ring 1', en: 'Ring 1' },
   { key: 'ring2', de: 'Ring 2', en: 'Ring 2' },
@@ -18,6 +18,16 @@ const SLOTS = [
   { key: 'fokus', de: 'Fokus', en: 'Offhand' },
 ];
 const SLOT_BY_KEY = Object.fromEntries(SLOTS.map(s => [s.key, s]));
+/** Ältere/abweichende Schlüssel → Slot-Schlüssel der Datendateien. */
+const SLOT_ALIAS = { haende: 'handschuhe', beine: 'hose', fuesse: 'stiefel', ring: 'ring1', helm: 'kopf', amulet: 'amulett', offhand: 'fokus' };
+const slotKey = k => (SLOT_BY_KEY[k] ? k : SLOT_ALIAS[k] || '');
+/** Liest einen Slot aus einem Objekt, auch unter altem Schlüssel. */
+function slotAus(obj, key) {
+  if (!obj) return undefined;
+  if (obj[key] !== undefined) return obj[key];
+  const alt = Object.keys(SLOT_ALIAS).find(a => SLOT_ALIAS[a] === key && obj[a] !== undefined);
+  return alt ? obj[alt] : undefined;
+}
 
 /* ---------------- Text-Helfer ---------------- */
 
@@ -131,40 +141,71 @@ function farmQuelle(wissen, f) {
   return f.typ && q && !q.includes('[') ? `${q} [${f.typ}]` : q;
 }
 
-/** Woher bekomme ich ein Item? uniqueQuellen → farmziele → eintraege. */
+/** Eintrag aus wissen.eintraege zu einem Namen (DE/EN/Alias), auch wenn der Name "DE (EN)" ist. */
+function eintragZu(wissen, name) {
+  if (!name) return null;
+  const n = norm(name);
+  const list = asArray(wissen && wissen.eintraege);
+  const namen = e => [e.name_de, e.name_en, e.name, ...asArray(e.aliase)].map(norm).filter(Boolean);
+  return list.find(e => namen(e).includes(n)) ||
+    list.find(e => namen(e).some(k => k.length >= 3 && hasWords(n, k))) || null;
+}
+
+/**
+ * Woher bekomme ich ein Item? Freitext aus eintraege[].quelle, dazu jeder Farmziel-Eintrag,
+ * dessen quelle_de/quelle_en in diesem Text vorkommt oder der das Item als Belohnung nennt.
+ * @returns {{text: string, farm: object|null}[]}
+ */
 function quellenFuerName(wissen, name) {
   const out = [];
-  const add = (text, farm) => { if (text && !out.some(o => norm(o.text) === norm(text))) out.push({ text, farm }); };
   if (!name) return out;
-  const passt = x => [x.name_de, x.name_en, x.name, x.slug && String(x.slug).replace(/-/g, ' ')].some(n => n && textPasst(name, n));
-  for (const u of asArray(wissen && wissen.uniqueQuellen)) {
-    if (passt(u)) asArray(u.quellen || u.quelle).forEach(q => add(quelleText(wissen, q), false));
-  }
+  const e = eintragZu(wissen, name);
+  const qtext = e && e.quelle ? listText(e.quelle) : '';
+  if (qtext) out.push({ text: qtext, farm: null });
+  const nq = norm(qtext);
   for (const f of asArray(wissen && wissen.farmziele)) {
-    if (asArray(f.belohnungen).some(b => textPasst(name, itemText(b)))) add(farmQuelle(wissen, f), true);
-  }
-  for (const e of asArray(wissen && wissen.eintraege)) {
-    if (passt(e) && e.quelle) asArray(e.quelle).forEach(q => add(quelleText(wissen, q), false));
+    const fn = [f.quelle_de, f.quelle_en, f.quelle].map(norm).filter(Boolean);
+    const perQuelle = nq && fn.some(x => hasWords(nq, x));
+    const perBeute = asArray(f.belohnungen).some(b => textPasst(name, itemText(b)) || (e && textPasst(itemText(b), e.name_de || e.name_en)));
+    if (!perQuelle && !perBeute) continue;
+    const t = farmQuelle(wissen, f);
+    if (t && !out.some(o => o.farm && norm(o.text) === norm(t))) {
+      out.push({ text: t, farm: { kosten: listText(f.kosten), belohnungen: listText(f.belohnungen), notiz: f.notiz || '' } });
+    }
   }
   return out;
 }
 
 /* ---------------- Katalog ---------------- */
 
+/** Einträge einer Katalog-Kategorie (katalog.kategorien.X.einträge), alte Form katalog.uniques wird auch gelesen. */
+function katalogListe(katalog, kategorie) {
+  if (!katalog) return [];
+  const k = katalog.kategorien && katalog.kategorien[kategorie];
+  if (k) return asArray(k['einträge'] || k.eintraege || k.items);
+  return asArray(katalog[kategorie]);
+}
+/** Vergleichsform für Katalognamen: Apostrophe weg, _/- wie Leerzeichen („Aegrom's Schism“ = aegroms_schism). */
+const slugNorm = s => norm(String(s || '').replace(/['’`]/g, '').replace(/[_-]+/g, ' '));
+
 function findeUnique(katalog, name, slug) {
-  const list = asArray(katalog && (katalog.uniques || katalog.eintraege));
-  const s = slug || slugify(name);
-  return list.find(u => (u.slug && u.slug === s)) ||
-    list.find(u => [u.name_de, u.name_en, u.name].some(n => n && norm(n) === norm(name))) || null;
+  const list = katalogListe(katalog, 'uniques');
+  const s = slugNorm(slug || name), n = slugNorm(name);
+  return list.find(u => u.slug && slugNorm(u.slug) === s) ||
+    list.find(u => [u.name_de, u.name_en, u.name, u.slug].some(x => x && slugNorm(x) === n)) || null;
 }
 
 /* ---------------- Inventar ---------------- */
 
-const MATERIAL = {
-  prisma: { de: 'Zerstreutes Prisma', en: 'Scattered Prism' },
-  obduzit: { de: 'Obduzit', en: 'Obducite' },
-  seelen: { de: 'Vergessene Seelen', en: 'Forgotten Souls' },
-  schriftrolle: { de: 'Schriftrolle der Wiederherstellung', en: 'Scroll of Restoration' },
+/**
+ * Welche Aktion welches Material braucht – nur der bestandsschluessel steht im Code,
+ * Anzeigename und Engpass-Markierung kommen aus wissen.eintraege.
+ */
+const AKTION_MATERIAL = {
+  sockelHinzufuegen: 'Scattered Prism',
+  vollenden: 'Obducite',
+  verzaubernVermacht: 'Forgotten Souls',
+  haertungZuruecksetzen: 'Scroll of Restoration',
 };
 
 function leeresItem() {
@@ -200,33 +241,50 @@ function normalizeItem(it) {
 }
 function normalizeInventar(inv) {
   const out = {};
-  for (const s of SLOTS) out[s.key] = normalizeItem(inv && inv[s.key]);
+  for (const s of SLOTS) out[s.key] = normalizeItem(slotAus(inv, s.key));
   return out;
 }
 
-/** Bestand eines Materials aus profil.bestand – null, wenn unbekannt. */
-function bestandVon(bestand, mat) {
-  if (!bestand || typeof bestand !== 'object') return null;
-  for (const [k, v] of Object.entries(bestand)) {
-    const n = norm(k);
-    if ([mat.de, mat.en].some(m => { const x = norm(m); return n === x || phraseEq(n, x) || phraseIn(n, x); })) {
-      const z = zahl(v, null);
-      return z;
-    }
-  }
-  return null;
+/** Bestand aus profil.bestand[schluessel] – null, wenn der Schlüssel fehlt oder null ist (= unbekannt). */
+function bestandVon(bestand, schluessel) {
+  if (!bestand || typeof bestand !== 'object' || !schluessel) return null;
+  if (!Object.prototype.hasOwnProperty.call(bestand, schluessel)) return null;
+  return zahl(bestand[schluessel], null);
 }
 
+/** Materialeinträge = Einträge mit bestandsschluessel. */
+const materialEintraege = wissen => asArray(wissen && wissen.eintraege).filter(e => e.bestandsschluessel);
+
+/** Material für eine Aktion: Name aus den Daten, Menge aus dem Bestand. */
+function material(wissen, bestand, schluessel, menge) {
+  const e = materialEintraege(wissen).find(x => x.bestandsschluessel === schluessel);
+  const hat = bestandVon(bestand, schluessel);
+  const braucht = menge == null ? 1 : menge;
+  return {
+    schluessel, menge: menge == null ? null : menge,
+    de: e ? (e.name_de || e.name || schluessel) : schluessel,
+    en: e ? (e.name_en || '') : '',
+    engpass: !!(e && e.engpass),
+    imWissen: !!e,
+    bestand: hat,
+    blockiert: hat != null && hat < braucht,
+  };
+}
+
+/** Engpässe: wissen.engpaesse, sonst Einträge mit engpass:true, sonst alle Einträge mit typ "material". */
 function engpassListe(wissen) {
   const e = asArray(wissen && wissen.engpaesse).map(itemText).filter(Boolean);
-  if (e.length) return { liste: e, abgeleitet: false };
+  if (e.length) return { liste: e, herkunft: 'engpaesse' };
+  const eng = materialEintraege(wissen).filter(x => x.engpass).map(x => bi(x.name_de || x.name, x.name_en));
+  if (eng.length) return { liste: eng, herkunft: 'engpass' };
   const m = asArray(wissen && wissen.eintraege).filter(x => norm(x.typ) === 'material')
     .map(x => bi(x.name_de || x.name, x.name_en)).filter(Boolean);
-  return { liste: m, abgeleitet: true };
+  return { liste: m, herkunft: 'material' };
 }
 function istEngpass(wissen, mat) {
   if (!mat) return false;
-  return engpassListe(wissen).liste.some(x => textPasst(x, mat.de) || textPasst(x, mat.en));
+  if (mat.engpass) return true;
+  return engpassListe(wissen).liste.some(x => textPasst(x, mat.de) || (mat.en && textPasst(x, mat.en)));
 }
 
 const STANDARD_REIHENFOLGE = ['affixe', 'sockel', 'aspekt', 'haerten', 'vollenden', 'transfigurieren'];
@@ -261,7 +319,7 @@ function istUnique(wissen, seltenheit) {
 const TEXT = {
   einAffix: 'Pro Item ist nur EIN Affix verzauberbar. Sobald du einen anfasst, sind die anderen fix. Wähle die schlechteste Zeile.',
   grossUnsicher: 'Unsicher: Ob ein umgerollter großer Affix seinen Status behält, ist unklar – Vorschau im Spiel prüfen.',
-  seelen: 'Kostet seit Patch 3.2.1 nur noch 10 statt 25 Vergessene Seelen.',
+  seelen: name => `Kostet seit Patch 3.2.1 nur noch 10 statt 25 ${name}.`,
   keinReset: 'Kein Reset möglich – erster brauchbarer Wurf zählt.',
   vollendenReset: 'Vollendung ist jederzeit zurücksetzbar, das Item wird nicht zerstört.',
   nichtHaerten: 'Noch nicht härten, das Teil wird ersetzt.',
@@ -280,11 +338,12 @@ function analysiereSlot({ slotKey, item, build, andererBuild, charakter, bestand
   const aktion = a => out.aktionen.push(Object.assign({ prio: 'mittel', gruppe: 'gold', grund: '' }, a));
 
   if (!build) { info('allgemein', 'Kein Build gesetzt – nichts zum Vergleichen.'); return out; }
-  const slot = (build.slots && build.slots[slotKey]) || {};
+  const slot = slotAus(build.slots, slotKey) || {};
+  const mat = (key, menge) => material(wissen, bestand, AKTION_MATERIAL[key], menge);
   const zielItem = String(slot.zielItem || '').trim();
   const zielAspekt = String(slot.zielAspekt || '').trim();
   const zielAffixe = asArray(slot.affixe).map(String).filter(Boolean);
-  const andereAffixe = asArray(andererBuild && andererBuild.slots && andererBuild.slots[slotKey] && andererBuild.slots[slotKey].affixe).map(String);
+  const andereAffixe = asArray((slotAus(andererBuild && andererBuild.slots, slotKey) || {}).affixe).map(String);
   out.ziel = { zielItem, zielAspekt, sockel: slot.sockel || '', haertung: slot.haertung || '', affixe: zielAffixe };
 
   /* ---------- leerer Slot ---------- */
@@ -350,11 +409,12 @@ function analysiereSlot({ slotKey, item, build, andererBuild, charakter, bestand
     } else if (wirdErsetzt) {
       info('sockel', `Kein Sockel für „${req}“ – aber nicht hinzufügen, das Teil wird ersetzt.`);
     } else {
+      const m = mat('sockelHinzufuegen', 1);
       aktion({
         kategorie: 'sockel', gruppe: 'material', prio: splitter ? 'hoch' : 'mittel',
-        text: 'Sockel hinzufügen beim Juwelenschmied, kostet 1 Zerstreutes Prisma',
+        text: `Sockel hinzufügen beim Juwelenschmied, kostet 1 ${m.de}`,
         grund: `Build sieht „${req}“ vor${splitter ? ' (Splitter)' : ''}, das Item hat keinen freien Sockel.`,
-        material: { ...MATERIAL.prisma, menge: 1 },
+        material: m,
       });
     }
   }
@@ -382,13 +442,13 @@ function analysiereSlot({ slotKey, item, build, andererBuild, charakter, bestand
         text: `Zeile „${k.a.text}“ umrollen auf „${ziel}“`,
         grund: `„${ziel}“ fehlt (Priorität ${rang + 1} im Build). „${k.a.text}“ ist ${k.anderer ? 'nur im anderen Build gefragt' : 'in keinem Build gefragt'}.`,
         kandidaten: kandidaten.map(x => `${x.a.text}${x.anderer ? ' (anderer Build)' : ''}`),
-        material: item.vermacht ? { ...MATERIAL.seelen, menge: 10 } : null,
+        material: item.vermacht ? mat('verzaubernVermacht', 10) : null,
       });
     } else {
       info('affixe', `Es fehlt „${fehlend[0]}“, aber alle umrollbaren Zeilen sind schon Zielaffixe.`);
     }
   }
-  if (!wirdErsetzt && item.vermacht && !verzaubert) info('affixe', TEXT.seelen);
+  if (!wirdErsetzt && item.vermacht && !verzaubert) info('affixe', TEXT.seelen(mat('verzaubernVermacht', 10).de));
   info('affixe', TEXT.grossUnsicher, 'unsicher');
   if (!wirdErsetzt && zielAffixe.length && !fehlend.length && affixe.some(a => a.schwach)) {
     const rezept = asArray(wissen && wissen.rezepte).find(r => r.id === 'reroll-affixwerte');
@@ -402,7 +462,8 @@ function analysiereSlot({ slotKey, item, build, andererBuild, charakter, bestand
 
   /* ---------- Härten ---------- */
   const h = item.haertungen || { genutzt: 0, max: 0 };
-  const rollen = bestandVon(bestand, MATERIAL.schriftrolle);
+  const rolle = mat('haertungZuruecksetzen', 1);
+  const rollen = rolle.bestand;
   if (!(h.max > 0)) {
     info('haerten', 'Härtungen nicht erfasst (max = 0).');
   } else if (h.genutzt < h.max) {
@@ -422,7 +483,7 @@ function analysiereSlot({ slotKey, item, build, andererBuild, charakter, bestand
         kategorie: 'haerten', gruppe: 'material', prio: 'niedrig',
         text: `Härtung „${h.affix}“ zurücksetzen und auf „${slot.haertung}“ härten`,
         grund: 'Alle Härtungen sind verbraucht, der Affix passt nicht zum Build.',
-        material: { ...MATERIAL.schriftrolle, menge: 1 },
+        material: rolle,
       });
     } else {
       info('haerten', `Härtung „${h.affix}“ passt nicht zu „${slot.haertung}“ – ${keeper ? TEXT.keinReset : TEXT.nichtHaerten}`);
@@ -441,7 +502,7 @@ function analysiereSlot({ slotKey, item, build, andererBuild, charakter, bestand
       aktion({
         kategorie: 'vollenden', gruppe: 'material', prio: 'niedrig',
         text: `Vollenden (${v.stufe}/${v.max})`, grund: 'Keeper, Qual 4 erreicht.',
-        material: { ...MATERIAL.obduzit, menge: null },
+        material: mat('vollenden', null),
         zusatz: TEXT.vollendenReset,
       });
     }
@@ -449,6 +510,9 @@ function analysiereSlot({ slotKey, item, build, andererBuild, charakter, bestand
 
   /* ---------- Reihenfolge ---------- */
   const rf = reihenfolgeNotiz(wissen).reihenfolge;
+  // Blockierte Aktionen (Bestand reicht nicht) nach unten, nicht verstecken
+  out.aktionen.forEach(a => { a.blockiert = !!(a.material && a.material.blockiert); });
+  out.aktionen.sort((a, b) => Number(a.blockiert) - Number(b.blockiert));
   const bearbeiten = out.aktionen.filter(a => rf.includes(a.kategorie));
   if (bearbeiten.length > 1) {
     out.reihenfolge = [...bearbeiten].sort((a, b) => rf.indexOf(a.kategorie) - rf.indexOf(b.kategorie));
@@ -458,6 +522,48 @@ function analysiereSlot({ slotKey, item, build, andererBuild, charakter, bestand
 
 const PRIO_RANG = { hoch: 0, mittel: 1, niedrig: 2 };
 
+/** Farbnamen aus wissen.verdikte[].farbe → CSS. Hex/rgb werden durchgereicht. */
+const FARBNAMEN = {
+  gruen: '#2e9b50', grün: '#2e9b50', violett: '#8a4fd6', lila: '#8a4fd6', blau: '#2f7fcf', tuerkis: '#1b9aa0',
+  türkis: '#1b9aa0', grau: '#6f6a64', gold: '#c9a227', gelb: '#d8b43a', orange: '#d0702a', rot: '#b8432f', braun: '#8b5a2b',
+};
+function farbeCss(f) {
+  const x = String(f || '').trim().toLowerCase();
+  if (/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|hsla?\([\d\s.,%deg]+\))$/i.test(x)) return x;
+  return FARBNAMEN[x] || '';
+}
+
+/**
+ * Prüft Querverweise zwischen wissen.json und profil.json.
+ * @returns {{fehlendeRezepte: object[], fehlendeVerdikte: object[], bestandFehlt: string[], bestandNull: string[], bestandOhneMaterial: string[], slotsUnbekannt: string[], buildsFehlen: string[]}}
+ */
+function pruefeIntegritaet(wissen, profil) {
+  const rezeptIds = new Set(asArray(wissen && wissen.rezepte).map(r => r.id));
+  const verdikte = new Set(asArray(wissen && wissen.verdikte).map(v => norm(v.id)));
+  const out = { fehlendeRezepte: [], fehlendeVerdikte: [], bestandFehlt: [], bestandNull: [], bestandOhneMaterial: [], slotsUnbekannt: [], buildsFehlen: [] };
+  const pruefe = (wo, x) => {
+    for (const id of asArray(x.rezepte)) if (!rezeptIds.has(id)) out.fehlendeRezepte.push({ wo, id });
+    if (x.verdikt && !verdikte.has(norm(x.verdikt))) out.fehlendeVerdikte.push({ wo, id: x.verdikt });
+  };
+  asArray(wissen && wissen.eintraege).forEach(e => pruefe(`Eintrag ${e.name_de || e.name_en}`, e));
+  asArray(wissen && wissen.regeln).forEach(r => pruefe(`Regel ${r.id}`, r));
+  asArray(profil && profil.abweichungen).forEach((a, i) => { if (a.verdikt) pruefe(`Abweichung ${i + 1}`, { verdikt: a.verdikt }); });
+  const bestand = (profil && profil.bestand) || {};
+  const schluessel = materialEintraege(wissen).map(e => e.bestandsschluessel);
+  for (const k of schluessel) {
+    if (!Object.prototype.hasOwnProperty.call(bestand, k)) out.bestandFehlt.push(k);
+    else if (bestand[k] == null) out.bestandNull.push(k);
+  }
+  for (const k of Object.keys(bestand)) if (!schluessel.includes(k)) out.bestandOhneMaterial.push(k);
+  for (const b of asArray(profil && profil.builds)) {
+    for (const k of Object.keys(b.slots || {})) if (!slotKey(k)) out.slotsUnbekannt.push(`${b.id}.${k}`);
+  }
+  for (const [feld, id] of [['aktiverBuild', profil && profil.aktiverBuild], ['zielBuild', profil && profil.zielBuild]]) {
+    if (id && !asArray(profil.builds).some(b => b.id === id)) out.buildsFehlen.push(`${feld} = ${id}`);
+  }
+  return out;
+}
+
 /* ================================================================
    Tooltip-Erkennung (OCR-Zeilen → Entwurf)
    ================================================================ */
@@ -465,19 +571,21 @@ const PRIO_RANG = { hoch: 0, mittel: 1, niedrig: 2 };
 const TYP_ZU_SLOT = [
   ['kopf', /\b(helm|helmet|kopfschutz|helme?)\b/i],
   ['brust', /\b(chest armou?r|chest|brustschutz|brustrüstung|rüstung)\b/i],
-  ['haende', /\b(gloves|handschuhe)\b/i],
-  ['beine', /\b(pants|legs|hose|beinschutz)\b/i],
-  ['fuesse', /\b(boots|stiefel)\b/i],
+  ['handschuhe', /\b(gloves|handschuhe)\b/i],
+  ['hose', /\b(pants|legs|hose|beinschutz)\b/i],
+  ['stiefel', /\b(boots|stiefel)\b/i],
   ['amulett', /\b(amulet|amulett)\b/i],
   ['ring1', /\b(ring)\b/i],
   ['fokus', /\b(focus|shield|totem|off-?hand|fokus|schild)\b/i],
   ['waffe', /\b(sword|axe|mace|bow|crossbow|staff|wand|dagger|scythe|polearm|glaive|flail|quarterstaff|weapon|schwert|axt|streitkolben|bogen|armbrust|stab|zauberstab|dolch|sense|stangenwaffe|gleve|flegel|kampfstab|waffe)\b/i],
 ];
 
-function slotVorschlag({ itemTyp, name, katalog, inventar }) {
+function slotVorschlag({ itemTyp, name, katalog, inventar, wissen }) {
   const u = name ? findeUnique(katalog, name) : null;
-  let key = u && u.slot && SLOT_BY_KEY[u.slot] ? u.slot : '';
-  let warum = key ? 'aus katalog.json' : '';
+  const e = name ? eintragZu(wissen, name) : null;
+  let key = e && slotKey(e.slot) ? slotKey(e.slot) : '';
+  let warum = key ? 'aus wissen.json (Eintrag)' : '';
+  if (!key && u && slotKey(u.slot)) { key = slotKey(u.slot); warum = 'aus katalog.json'; }
   if (!key) {
     const t = [itemTyp, u && u.itemTyp].filter(Boolean).join(' ');
     for (const [k, re] of TYP_ZU_SLOT) if (re.test(t)) { key = k; warum = `aus Item-Typ „${itemTyp || u.itemTyp}“`; break; }
@@ -579,8 +687,10 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
     if (n != null) {
       affixe.slice(0, n).forEach(a => { a.implizit = true; });
       implizitHinweis = `Erste ${n} Zeile(n) laut katalog.json als implizit markiert – bitte prüfen.`;
+    } else if (u) {
+      implizitHinweis = `„${u.name_en || u.slug}“ steht im Katalog, aber ohne num_inherents – implizite Affixe bitte selbst markieren.`;
     } else {
-      implizitHinweis = 'Unique nicht in katalog.json (oder ohne num_inherents) – implizite Affixe bitte selbst markieren.';
+      implizitHinweis = 'Unique nicht in katalog.json – implizite Affixe bitte selbst markieren.';
     }
   }
   if (u && !item.itemTyp && u.itemTyp) item.itemTyp = u.itemTyp;
@@ -588,7 +698,7 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
 
   return {
     item,
-    slot: slotVorschlag({ itemTyp: item.itemTyp, name: item.name, katalog, inventar }),
+    slot: slotVorschlag({ itemTyp: item.itemTyp, name: item.name, katalog, inventar, wissen }),
     unique: u,
     implizitHinweis,
     roh: clean.map(l => l.text).join('\n'),
@@ -597,9 +707,10 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    SLOTS, SLOT_BY_KEY, norm, tokens, hasWords, wordEq, phraseEq, phraseIn, textPasst, bi, itemText, listText,
+    SLOTS, SLOT_BY_KEY, SLOT_ALIAS, slotKey, slotAus, norm, tokens, hasWords, wordEq, phraseEq, phraseIn, textPasst, bi, itemText, listText,
     asArray, splitParts, slugify, seltenheitKanon, quelleText, farmQuelle, quellenFuerName, findeUnique,
-    MATERIAL, leeresItem, normalizeItem, normalizeInventar, bestandVon, engpassListe, istEngpass,
+    katalogListe, eintragZu, AKTION_MATERIAL, material, materialEintraege, farbeCss, pruefeIntegritaet,
+    leeresItem, normalizeItem, normalizeInventar, bestandVon, engpassListe, istEngpass,
     reihenfolgeNotiz, STANDARD_REIHENFOLGE, KATEGORIE_LABEL, analysiereSlot, PRIO_RANG, TEXT,
     slotVorschlag, parseTooltip,
   };

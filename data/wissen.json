@@ -1,119 +1,732 @@
 {
-  "_info": "Spielwissen – für alle Nutzer gleich. Wird bei einem Update KOMPLETT ersetzt. Persönliches gehört in profil.json.",
+  "_info": "Gemeinsame Wissensdatenbank. Für alle Nutzer identisch. Diese Datei wird beim Patchen komplett ersetzt – persönliche Daten stehen in profil.json und bleiben unberührt.",
   "schemaVersion": 2,
-  "version": "2",
+  "version": 3,
   "stand": "2026-09-25",
+  "season": 15,
+  "quellen": [
+    {
+      "name": "Mobalytics – Blazing Scream Warlock (MrRonit)",
+      "url": "https://mobalytics.gg/diablo-4/builds/blazing-scream-warlock-endgame-build",
+      "stand": "2026-09-25"
+    },
+    {
+      "name": "Vitablo – Sengender Schrei Hexenmeister (Yuni)",
+      "url": "https://vitablo.de/diablo-4-build/sengender-schrei-hexenmeister-build/",
+      "stand": "2026-09-25"
+    },
+    {
+      "name": "Maxroll – Blazing Scream Warlock",
+      "url": "https://maxroll.gg/d4/build-guides/blazing-scream-warlock-guide",
+      "stand": "2026-09-25"
+    },
+    {
+      "name": "Vitablo – Materialien-Farmguide",
+      "url": "https://vitablo.de/diablo-4-guide/materialien-farmguide/",
+      "stand": "2026-09-16"
+    },
+    {
+      "name": "Marvolomania – Crafting-Änderungen Season 15 (Patch 3.2.1)",
+      "url": "https://marvolomania.de/diablo-4-season-15-crafting-aenderungen/",
+      "stand": "2026-09-18"
+    },
+    {
+      "name": "Marvolomania – Item Crafting: Reihenfolge",
+      "url": "https://marvolomania.de/d4/item-crafting/",
+      "stand": "2026-09-18"
+    },
+    {
+      "name": "4Fansites – Siegel und Zauber mit dem Horadrimwürfel optimieren",
+      "url": "https://diablo.4fansites.de/news,14817,Diablo-4-Season-15-So-optimierst-du-Siegel-und-Zauber-mit-dem-Horadrimwuerfel.html",
+      "stand": "2026-09-20"
+    }
+  ],
+  "warnung": "Momentaufnahme. Im Zweifel gilt immer der Tooltip im Spiel.",
+  "seltenheitSynonyme": {
+    "gewöhnlich": [
+      "weiß",
+      "weiss",
+      "white",
+      "common",
+      "normal"
+    ],
+    "magisch": [
+      "blau",
+      "blue",
+      "magic"
+    ],
+    "selten": [
+      "gelb",
+      "yellow",
+      "rare"
+    ],
+    "legendär": [
+      "orange",
+      "legendary"
+    ],
+    "einzigartig": [
+      "braun",
+      "gold",
+      "unique"
+    ],
+    "mythisch": [
+      "rot",
+      "red",
+      "mythic"
+    ],
+    "vermacht": [
+      "900",
+      "ancestral",
+      "900er"
+    ]
+  },
   "verdikte": [
     {
       "id": "BEHALTEN",
-      "farbe": "#2e9b50",
-      "text": "Aufheben"
+      "farbe": "gruen",
+      "text": "Behalten"
     },
     {
       "id": "WÜRFELN",
-      "farbe": "#8a4fd6",
-      "text": "In den Horadrimwürfel (Horadric Cube)"
+      "farbe": "violett",
+      "text": "In den Horadrimwürfel"
     },
     {
       "id": "ZERLEGEN",
-      "farbe": "#d0702a",
-      "text": "Beim Schmied zerlegen (Salvage)"
+      "farbe": "blau",
+      "text": "Beim Schmied zerlegen"
     },
     {
       "id": "VERWERTEN",
-      "farbe": "#2f7fcf",
-      "text": "Als Material verwenden"
+      "farbe": "tuerkis",
+      "text": "Beim Okkultisten verwerten"
     },
     {
       "id": "VERKAUFEN",
-      "farbe": "#8a8a3a",
-      "text": "Beim Händler verkaufen (Sell)"
+      "farbe": "grau",
+      "text": "Verkaufen"
     },
     {
       "id": "ANLEGEN",
-      "farbe": "#c9a227",
-      "text": "Sofort ausrüsten (Equip)"
+      "farbe": "gold",
+      "text": "Sofort anlegen"
     }
   ],
-  "seltenheitSynonyme": [
+  "eintraege": [
     {
-      "id": "gewöhnlich",
-      "name_de": "Gewöhnlich",
-      "name_en": "Common",
-      "synonyme": [
-        "weiß",
-        "white",
-        "common",
-        "gewöhnlich"
-      ]
+      "name_de": "Elegie",
+      "name_en": "Elegy",
+      "aliase": [
+        "elege",
+        "elige"
+      ],
+      "typ": "unique",
+      "slot": "waffe",
+      "verdikt": "ANLEGEN",
+      "begruendung": "Baut den Build erst auf: macht Sengender Schrei zur Erzfeindfertigkeit, +30–50%[x] Schaden, Schädelspalter gratis, kleine Schädel machen denselben Schaden wie der große.",
+      "quelle": "Fürst Zir (Lord Zir)",
+      "rezepte": [
+        "craft-unique"
+      ],
+      "stand": "2026-09-25"
     },
     {
-      "id": "magisch",
-      "name_de": "Magisch",
-      "name_en": "Magic",
-      "synonyme": [
-        "blau",
-        "blue",
-        "magic",
-        "magisch"
-      ]
+      "name_de": "Infernaler Homunkulus",
+      "name_en": "Infernal Homunculus",
+      "aliase": [
+        "homunculus"
+      ],
+      "typ": "unique",
+      "slot": "fokus",
+      "verdikt": "ANLEGEN",
+      "begruendung": "Erzfeindfertigkeiten +80–110%[x] Schaden. Zusammen mit der Elegie der größte Multiplikator im Build.",
+      "quelle": "Urivar",
+      "rezepte": [
+        "amalgam-bosstrophaee"
+      ],
+      "stand": "2026-09-25"
     },
     {
-      "id": "selten",
-      "name_de": "Selten",
-      "name_en": "Rare",
-      "synonyme": [
-        "gelb",
-        "yellow",
-        "rare",
-        "selten"
-      ]
+      "name_de": "Pulsierende Flamme des Molochs",
+      "name_en": "Moloch's Beating Flame",
+      "aliase": [
+        "moloch",
+        "molochs"
+      ],
+      "typ": "unique",
+      "slot": "amulett",
+      "verdikt": "ANLEGEN",
+      "begruendung": "Höllenfeuer +20–30%[x] pro durch Unberechenbarkeit verstärkte Fertigkeit, dazu bis +50%[+] Kernattribute.",
+      "quelle": "Der Schlächter (The Butcher), Großer Unterschlupfschlüssel",
+      "stand": "2026-09-25"
     },
     {
-      "id": "legendär",
-      "name_de": "Legendär",
-      "name_en": "Legendary",
-      "synonyme": [
-        "orange",
-        "legendary",
-        "legendär"
-      ]
+      "name_de": "Der Götze der acht Gesichter",
+      "name_en": "The Eightfold Idol",
+      "aliase": [
+        "goetze",
+        "eightfold",
+        "idol"
+      ],
+      "typ": "unique",
+      "slot": "ring",
+      "verdikt": "ANLEGEN",
+      "begruendung": "Sengender Schrei hinterlässt Lava-/Schattenspuren, Gegner darauf nehmen 60–80%[x] mehr Schaden. Löst Siegel der Lava automatisch aus.",
+      "quelle": "Bestie im Eis (Beast in the Ice)",
+      "stand": "2026-09-25"
     },
     {
-      "id": "einzigartig",
-      "name_de": "Einzigartig",
-      "name_en": "Unique",
-      "synonyme": [
-        "braun",
-        "brown",
-        "gold",
-        "unique",
-        "einzigartig"
-      ]
+      "name_de": "Verwegenheit",
+      "name_en": "Temerity",
+      "aliase": [
+        "temerity",
+        "hose unique"
+      ],
+      "typ": "unique",
+      "slot": "hose",
+      "verdikt": "ANLEGEN",
+      "begruendung": "Überheilung wird zu 80–100% als Barriere für 8 Sekunden. Heiltrank auch bei vollem Leben trinkbar. Zusammen mit dem Sadistischen Aspekt der Überlebenskern.",
+      "quelle": "Vorbote des Hasses (Harbinger of Hatred), Großer Unterschlupfschlüssel",
+      "rezepte": [
+        "craft-unique"
+      ],
+      "stand": "2026-09-25"
     },
     {
-      "id": "mythisch",
-      "name_de": "Mythisch",
-      "name_en": "Mythic",
-      "synonyme": [
-        "rot",
-        "red",
-        "mythic",
-        "mythisch"
-      ]
+      "name_de": "Leorics Krone",
+      "name_en": "Leoric's Crown",
+      "aliase": [
+        "leoric",
+        "krone"
+      ],
+      "typ": "unique",
+      "slot": "kopf",
+      "verdikt": "ANLEGEN",
+      "begruendung": "Splitter im Kopfschutz wirken doppelt so stark. Das große Chase-Item der Season.",
+      "quelle": "Baal (am schnellsten), alternativ Diablo/Mephisto. Laut Starter-Guide gibt es eine frühe Version aus der Questreihe und 850/900er aus saisonalen Dungeons – zuerst in der eigenen Truhe nachschauen.",
+      "stand": "2026-09-25"
     },
     {
-      "id": "vermacht",
-      "name_de": "Vermacht",
-      "name_en": "Ancestral",
-      "synonyme": [
-        "900",
-        "ancestral",
-        "vermacht"
-      ]
+      "name_de": "Verstohlenheit",
+      "name_en": "Stealth",
+      "aliase": [
+        "stealth"
+      ],
+      "typ": "runenwort",
+      "slot": "brust",
+      "verdikt": "ANLEGEN",
+      "begruendung": "Maximales Leben, 15% Schadensreduktion, Angriffsgeschwindigkeit, Beeinträchtigungsreduktion. Craftbar, also nicht von Drops abhängig.",
+      "quelle": "Horadrimwürfel: weißer Brustschutz + Tal + Eth",
+      "rezepte": [
+        "runenwort",
+        "recycle-uniques"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Enigma",
+      "name_en": "Enigma",
+      "aliase": [
+        "enigma"
+      ],
+      "typ": "runenwort",
+      "slot": "brust",
+      "verdikt": "ANLEGEN",
+      "begruendung": "Ränge zu allen Fertigkeiten, Schadensreduktion, Teleport auf Abruf. Endgame-Brustschutz.",
+      "quelle": "Horadrimwürfel: weißer Brustschutz + Jah + Ith + Ber",
+      "rezepte": [
+        "runenwort"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Hand der Apotheose",
+      "name_en": "Hand of Apotheosis",
+      "aliase": [
+        "apotheosis"
+      ],
+      "typ": "unique",
+      "slot": "handschuhe",
+      "verdikt": "ANLEGEN",
+      "begruendung": "Gibt alle Metamorphose-Varianten gratis.",
+      "quelle": "Bartuc",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Stein von Jordan",
+      "name_en": "Stone of Jordan",
+      "aliase": [
+        "soj",
+        "jordan"
+      ],
+      "typ": "unique",
+      "slot": "ring",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Schwächerer Multiplikator als Alternativen, macht aber extrem zäh, wenn man einen einzelnen Widerstand stapelt. Gleicht den Mehrschaden des Schwarzen Seelensteins aus.",
+      "quelle": "Baal (am schnellsten), alternativ Diablo/Mephisto",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Sabatons des Höllenhundes",
+      "name_en": "Hellhound's Sabatons",
+      "aliase": [
+        "sabatons"
+      ],
+      "typ": "unique",
+      "slot": "stiefel",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Abodian +200–280%[x] Schaden, zusätzliche Ausweichladung. Steht nur bei Vitablo im Setup – bei Mobalytics gehört der Slot dem Sadistischen Aspekt.",
+      "quelle": "Bestie im Eis",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "In-Geom",
+      "name_en": "In-Geom",
+      "aliase": [
+        "ingeom"
+      ],
+      "typ": "unique",
+      "slot": "waffe",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Elitegruppe besiegen senkt Abklingzeiten 15 Sekunden lang um 10 Sekunden. Wird in der Speedfarm-Variante getragen, nicht im Hauptbuild.",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Klinge der lodernden Sicht",
+      "name_en": "The Blade of Sight Aflame",
+      "aliase": [],
+      "typ": "unique",
+      "slot": "waffe",
+      "verdikt": "ZERLEGEN",
+      "begruendung": "Bombardement-Build, nicht Sengender Schrei. Einer der drei Schwert-Uniques, die beim Craft Unique konkurrieren.",
+      "quelle": "Urivar",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Sadistischer Aspekt",
+      "name_en": "Sadistic Aspect",
+      "aliase": [
+        "sadistic",
+        "sardistic"
+      ],
+      "typ": "aspekt",
+      "kategorie": "Vielseitigkeit (Utility)",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Heilt 1% des maximalen Lebens pro Kill. Zusammen mit Temerity die Dauerbarriere, die den Verbrennungsschaden von Metamorphose auffängt. Wichtig: wirkt nur bei Kills, hilft gegen einzelne Bossschläge nicht.",
+      "quelle": "Kodex – Legendaries zerlegen, oder Upgrade to Legendary mit Abstimmungsprisma",
+      "rezepte": [
+        "upgrade-legendary"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Brutaler Aspekt",
+      "name_en": "Brutal Aspect",
+      "aliase": [
+        "brutal"
+      ],
+      "typ": "aspekt",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Wandelt Angriffsgeschwindigkeit in Schaden um, laut Guide 250–300%. Kern der Starter-Variante, weil Umkreisender Schrei selbst nicht von Tempo profitiert.",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Aspekt der diabolischen Rüstung",
+      "name_en": "Aspect of Diabolical Armor",
+      "aliase": [
+        "diabolical"
+      ],
+      "typ": "aspekt",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Mehr Schadensreduktion. Hosen-Aspekt der Starter-Variante.",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Aspekt der Gerinnung",
+      "name_en": "Aspect of Coagulation",
+      "aliase": [
+        "coagulation"
+      ],
+      "typ": "aspekt",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Mehr Schadensreduktion, solange du gestählt bist. Passt zur Kettenaura, die Stählung erzeugt.",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Aspekt des höllischen Befehlshabers",
+      "name_en": "Hellbent Commander Aspect",
+      "aliase": [
+        "hellbent"
+      ],
+      "typ": "aspekt",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Mehr Beschwörungsschaden. Handschuh-Aspekt in Starter und Midgame.",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Aspekt der Zündung",
+      "name_en": "Aspect of Ignition",
+      "aliase": [
+        "ignition",
+        "incognition"
+      ],
+      "typ": "aspekt",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Durch Unberechenbarkeit verstärkte Fertigkeiten machen mehr Schaden, Chance dass Unberechenbarkeit bestehen bleibt. Ring-Aspekt in der Midgame-Variante.",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Dämonischer Aspekt",
+      "name_en": "Demonic Aspect",
+      "aliase": [
+        "demonic"
+      ],
+      "typ": "aspekt",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Mehr Schaden für Sengender Schrei. Ring-2-Aspekt der Starter-Variante.",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Unsterblicher Aspekt",
+      "name_en": "Undying Aspect",
+      "aliase": [
+        "undying"
+      ],
+      "typ": "aspekt",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Mehr Heilung. Stiefel-Aspekt im Endgame, dann wandert Sadistic aufs Amulett. Ersatz für Sadistic, wenn der fehlt.",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Duellierender Aspekt",
+      "name_en": "Duelist's Aspect",
+      "aliase": [
+        "duelist"
+      ],
+      "typ": "aspekt",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Handschuh-Aspekt bei Vitablo. Bei Mobalytics steht dort der Aspekt des höllischen Befehlshabers.",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Splitter des Schwarzen Seelensteins",
+      "name_en": "Splinter of the Black Soulstone",
+      "aliase": [
+        "black soulstone",
+        "seelenstein"
+      ],
+      "typ": "splitter",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Kills absorbieren Seelen, je Seele +3,8%[x] Schaden und +1% erlittener Schaden, bis 200 Stapel. Wichtigster Splitter. Ohne Leorics Krone gehört er ins Schmuckstück.",
+      "quelle": "Eskalierende Alptraumdungeons, Vorrat-Affix Diamant",
+      "rezepte": [
+        "amalgam-splitter"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Splitter der Qual",
+      "name_en": "Splinter of Anguish",
+      "aliase": [
+        "anguish"
+      ],
+      "typ": "splitter",
+      "verdikt": "BEHALTEN",
+      "begruendung": "+30%[+] Angriffsgeschwindigkeit und Krit-Chance, dafür +30% Ressourcenkosten. Deshalb sind Krit-Affixe in diesem Build wertvoll.",
+      "rezepte": [
+        "amalgam-splitter"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Splitter des Schmerzes",
+      "name_en": "Splinter of Pain",
+      "aliase": [
+        "pain"
+      ],
+      "typ": "splitter",
+      "verdikt": "BEHALTEN",
+      "begruendung": "25% Schadensreduktion, dafür -30% Bewegungstempo. Für Bosskämpfe ein guter Tausch.",
+      "rezepte": [
+        "amalgam-splitter"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Splitter der Sünde",
+      "name_en": "Splinter of Sin",
+      "aliase": [
+        "sin"
+      ],
+      "typ": "splitter",
+      "verdikt": "BEHALTEN",
+      "begruendung": "+50%[+] maximales Leben, dafür -30% maximale Primärressource. Leben gibt über Metamorphose zusätzlich Schaden.",
+      "rezepte": [
+        "amalgam-splitter"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Splitter der Mutter",
+      "name_en": "Splinter of the Mother",
+      "aliase": [
+        "mother"
+      ],
+      "typ": "splitter",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Ungehindert, berührte Gegner werden verwundbar, +physischer Widerstand. Nach 250 Berührungen 4 Sekunden Betäubung.",
+      "rezepte": [
+        "amalgam-splitter"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Splitter der Lügen",
+      "name_en": "Splinter of Lies",
+      "aliase": [
+        "lies"
+      ],
+      "typ": "splitter",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Nur zum Farmen: mehr Beute und Erfahrung, dafür mehr erlittener und weniger eigener Schaden. Zum Pushen rausnehmen.",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Splitter des Höllenfeuers",
+      "name_en": "Splinter of Hellfire",
+      "aliase": [
+        "hellfire",
+        "hellvire"
+      ],
+      "typ": "splitter",
+      "verdikt": "VERKAUFEN",
+      "begruendung": "Kommt in KEINER Mobalytics-Variante vor, nur in Vitablos T1-12-Setup. Nimmt 100% Krit-Chance – unvereinbar mit einem Build, der Krit stapelt.",
+      "notiz": "Wenn du noch gar keine Krit-Quellen hast, ist er kurzzeitig ein Gewinn. Sobald Splitter der Qual oder der Götze drin sind, nicht mehr.",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Rubin",
+      "name_en": "Ruby",
+      "aliase": [],
+      "typ": "edelstein",
+      "verdikt": "BEHALTEN",
+      "begruendung": "In der Waffe x32% Feuer- und Heiligschaden-Multiplikator – dein größter Einzelgewinn. In der Rüstung Stärke, im Schmuck Feuerwiderstand.",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Saphir",
+      "name_en": "Sapphire",
+      "aliase": [],
+      "typ": "edelstein",
+      "verdikt": "BEHALTEN",
+      "begruendung": "In der Rüstung Willenskraft, dein Hauptattribut.",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Schädel",
+      "name_en": "Skull",
+      "aliase": [],
+      "typ": "edelstein",
+      "verdikt": "WÜRFELN",
+      "begruendung": "Im Schmuck physischer Widerstand. Ansonsten Fragmente beim Juwelenschmied in Rubin oder Saphir umwandeln.",
+      "stand": "2026-09-25"
+    },
+    {
+      "name_de": "Unterschlupfschlüssel",
+      "name_en": "Lair Key",
+      "aliase": [
+        "liar key",
+        "lair key",
+        "schlüssel"
+      ],
+      "typ": "material",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Öffnet den Hort eines Unterschlupf-Bosses. Der Kampf selbst ist gratis – der Schlüssel wird erst beim Öffnen verbraucht. Sterben kostet also keinen Schlüssel.",
+      "quelle": "Nur auf Qualstufen: Schlüsselbeute in Kriegsplänen, Gequälte Geschenke in der Höllenflut, Weltbosse, Legionsereignisse, Truhen vom Flüsternden Baum, Unterstadt von Kurast",
+      "stand": "2026-09-25",
+      "bestandsschluessel": "Lair Key"
+    },
+    {
+      "name_de": "Großer Unterschlupfschlüssel",
+      "name_en": "Greater Lair Key",
+      "aliase": [],
+      "typ": "material",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Für Duriel, Andariel, Vorbote des Hasses und den Schlächter. Fällt vor allem bei Bossen.",
+      "stand": "2026-09-25",
+      "bestandsschluessel": "Greater Lair Key"
+    },
+    {
+      "name_de": "Exquisites Blut",
+      "name_en": "Exquisite Blood",
+      "aliase": [],
+      "typ": "material",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Bosstrophäe von Fürst Zir. Fünf Stück im Würfel ergeben ein garantiertes Unique aus seiner Tabelle – der deterministische Weg zur Elegie.",
+      "rezepte": [
+        "amalgam-bosstrophaee"
+      ],
+      "stand": "2026-09-25",
+      "schwelle": {
+        "menge": 5,
+        "einheit": "Stück",
+        "text": "Ab 5 Stück ergibt der Würfel ein garantiertes Unique dieses Bosses."
+      },
+      "bestandsschluessel": "Exquisite Blood"
+    },
+    {
+      "name_de": "Maske des Richters",
+      "name_en": "Judicator's Mask",
+      "aliase": [],
+      "typ": "material",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Bosstrophäe von Urivar. Fünf Stück ergeben ein garantiertes Urivar-Unique.",
+      "rezepte": [
+        "amalgam-bosstrophaee"
+      ],
+      "stand": "2026-09-25",
+      "schwelle": {
+        "menge": 5,
+        "einheit": "Stück",
+        "text": "Ab 5 Stück ergibt der Würfel ein garantiertes Unique dieses Bosses."
+      },
+      "bestandsschluessel": "Judicator's Mask"
+    },
+    {
+      "name_de": "Verbesserter Urstaub",
+      "name_en": "Enhanced Primordial Dust",
+      "aliase": [],
+      "typ": "material",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Material für Craft Unique. Ein Versuch kostet 1 davon plus 10 Rohen Urstaub.",
+      "rezepte": [
+        "craft-unique"
+      ],
+      "stand": "2026-09-25",
+      "bestandsschluessel": "Enhanced Primordial Dust"
+    },
+    {
+      "name_de": "Reiner Urstaub",
+      "name_en": "Pure Primordial Dust",
+      "aliase": [],
+      "typ": "material",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Material für Upgrade to Legendary. Nur mit Abstimmungsprisma einsetzen, sonst würfelt man über alle Aspekt-Kategorien.",
+      "rezepte": [
+        "upgrade-legendary"
+      ],
+      "stand": "2026-09-25",
+      "bestandsschluessel": "Pure Primordial Dust",
+      "engpass": true
+    },
+    {
+      "name_de": "Veredelter Urstaub",
+      "name_en": "Refined Primordial Dust",
+      "aliase": [],
+      "typ": "material",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Für Affix entfernen – so stufst du ein gelbes Item auf Weiß herunter, um eine Craft-Basis zu bekommen.",
+      "stand": "2026-09-25",
+      "bestandsschluessel": "Refined Primordial Dust"
+    },
+    {
+      "name_de": "Pragmatisches Abstimmungsprisma",
+      "name_en": "Pragmatic Tuning Prism",
+      "aliase": [
+        "abstimmungsprisma",
+        "tuning prism"
+      ],
+      "typ": "material",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Zielt beim Upgrade to Legendary auf Mobilität und Vielseitigkeit – also auf den Sadistischen Aspekt.",
+      "quelle": "Tribut des Einfallsreichtums in der Unterstadt (mit Gold feilschen), Kriegsplan-Knoten Fein abgestimmt, Elitegegner, Truhen vom Flüsternden Baum, Eskalationssiegel-Affix Materialien reserviert",
+      "stand": "2026-09-25",
+      "bestandsschluessel": "Pragmatic Tuning Prism"
+    },
+    {
+      "name_de": "Zerstreutes Prisma",
+      "name_en": "Scattered Prism",
+      "aliase": [],
+      "typ": "material",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Fügt einem Item einen Sockel hinzu, 1 Prisma pro Sockel. Ohne sie kein Splitter im Schmuck.",
+      "quelle": "Auf Qualstufen häufig von Weltbossen und in der Dunklen Zitadelle, seltener Söldner-Tauschhandel, Höllenhorden, Anwärter-Unterschlupf-Bosse",
+      "stand": "2026-09-25",
+      "bestandsschluessel": "Scattered Prism",
+      "engpass": true
+    },
+    {
+      "name_de": "Erfülltes Horadrisches Harz",
+      "name_en": "Infused Horadric Resin",
+      "aliase": [
+        "harz"
+      ],
+      "typ": "material",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Währung für Talisman-Rezepte, vor allem Reroll Set Charm.",
+      "quelle": "Okkultist: Talisman verwerten",
+      "stand": "2026-09-25",
+      "bestandsschluessel": "Infused Horadric Resin"
+    },
+    {
+      "name_de": "Obduzit",
+      "name_en": "Obducite",
+      "aliase": [],
+      "typ": "material",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Vollendung (Masterworking). Erst ab Qual 4–6 sinnvoll, vorher verbranntes Material.",
+      "quelle": "Eskalierende Alptraumdungeons",
+      "stand": "2026-09-25",
+      "bestandsschluessel": "Obducite"
+    },
+    {
+      "name_de": "Schriftrolle der Wiederherstellung",
+      "name_en": "Scroll of Restoration",
+      "aliase": [],
+      "typ": "material",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Frischt Härtungsversuche auf. Ohne sie ist jeder Härtungsversuch endgültig.",
+      "stand": "2026-09-25",
+      "bestandsschluessel": "Scroll of Restoration",
+      "engpass": true
+    },
+    {
+      "name_de": "Alptraumsiegel",
+      "name_en": "Nightmare Sigil",
+      "aliase": [
+        "siegel"
+      ],
+      "typ": "material",
+      "verdikt": "BEHALTEN",
+      "begruendung": "Öffnet Alptraumdungeons – Hauptquelle für Glyphen. Fünf Stück ergeben ein Eskalationssiegel. Nicht alle in Eskalationen stecken, du brauchst auch normale Läufe für Glyphen.",
+      "quelle": "Okkultist aus Siegelpulver, Flüster-Truhen, Alptraumdungeons",
+      "rezepte": [
+        "amalgam-eskalationssiegel"
+      ],
+      "stand": "2026-09-25",
+      "schwelle": {
+        "menge": 5,
+        "einheit": "Siegel",
+        "text": "5 ergeben ein Eskalationssiegel. Nicht alle verbrauchen – normale Läufe sind die Glyphenquelle."
+      },
+      "bestandsschluessel": "Nightmare Sigil"
+    },
+    {
+      "name_de": "Vergessene Seelen",
+      "name_en": "Forgotten Soul",
+      "aliase": [
+        "seelen",
+        "forgotten souls"
+      ],
+      "typ": "material",
+      "verdikt": "BEHALTEN",
+      "bestandsschluessel": "Forgotten Souls",
+      "engpass": true,
+      "begruendung": "Währung für Verzaubern, Vollendung und Große Edelsteine. Seit Patch 3.2.1 kostet Verzaubern auf vermachten Items nur noch 10 statt 25.",
+      "quelle": "Bosse farmen, vermachte Uniques beim Schmied verwerten, eskalierende Alptraumdungeons mit Materialvorrat, Alchemist 'Materialien veredeln', Tribut der Veredelung in der Unterstadt",
+      "stand": "2026-09-25"
     }
   ],
-  "eintraege": [],
   "regeln": [
     {
       "id": "rune-ueberschuss",
@@ -125,75 +738,1271 @@
         ]
       },
       "suchbegriffe": [
+        "blaue rune",
         "gelbe rune",
+        "blue rune",
         "yellow rune",
-        "blaue runen"
+        "magic rune",
+        "rare rune",
+        "runen überschuss",
+        "runen"
       ],
       "verdikt": "WÜRFELN",
-      "begruendung": "",
+      "begruendung": "Niemals verkaufen. Drei Wege: 5 Runen gleicher Qualität im Würfel ergeben eine der nächsthöheren Stufe, 3 zu 1 wertet gezielt auf, oder der Juwelenschmied wandelt echten Überschuss 3 zu 1 um.",
       "ausnahmen": [
         "Nagu",
         "Que",
         "Tir",
-        "Igni"
+        "Igni",
+        "Kry",
+        "Mot",
+        "Cir",
+        "Tal",
+        "Eth",
+        "Ith",
+        "Jah",
+        "Ber"
       ],
-      "ausnahmeText": "Diese Runen braucht der Build direkt.",
-      "notiz": "",
+      "ausnahmeText": "Diese Runen braucht der Build direkt – behalten.",
+      "stand": "2026-09-25",
+      "schwelle": {
+        "menge": 5,
+        "einheit": "Runen gleicher Qualität",
+        "text": "Ab 5 gleicher Qualität lohnt die Aufwertung – bis dahin sammeln, nicht verwerten."
+      },
+      "rezepte": [
+        "amalgam-runen",
+        "transmutation-3-1"
+      ]
+    },
+    {
+      "id": "rune-legendaer",
+      "trifft": {
+        "typ": "rune",
+        "seltenheit": [
+          "legendär"
+        ]
+      },
+      "suchbegriffe": [
+        "legendäre rune",
+        "legendary rune",
+        "orange rune"
+      ],
+      "verdikt": "BEHALTEN",
+      "begruendung": "Rohstoff für die Runenwörter Stealth und Enigma. Nicht verbrauchen, bis klar ist, welche du brauchst.",
+      "stand": "2026-09-25",
+      "rezepte": [
+        "runenwort"
+      ]
+    },
+    {
+      "id": "item-legendaer-nicht-getragen",
+      "trifft": {
+        "typ": "ausruestung",
+        "seltenheit": [
+          "legendär"
+        ],
+        "getragen": false
+      },
+      "suchbegriffe": [
+        "legendary",
+        "legendär",
+        "oranges item",
+        "legendaries"
+      ],
+      "verdikt": "ZERLEGEN",
+      "begruendung": "Beim Zerlegen wandert der Aspekt automatisch in den Kodex der Macht – immer der höchste Wert, den du je zerlegt hast. Du kannst dabei nichts verlieren. Vermachte (900er) Items schalten zusätzlich die Kodex-Ränge 17–21 frei.",
+      "stand": "2026-09-25"
+    },
+    {
+      "id": "item-vermacht-mit-affixen",
+      "trifft": {
+        "typ": "ausruestung",
+        "seltenheit": [
+          "vermacht"
+        ]
+      },
+      "suchbegriffe": [
+        "900",
+        "ancestral",
+        "vermacht",
+        "900er item"
+      ],
+      "verdikt": "BEHALTEN",
+      "begruendung": "Erst Affixe prüfen: Maximales Leben und Willenskraft auf jedem Teil, dazu Krit-Chance, Krit-Schaden-Multiplikator, Verwundbar-Schaden und Ränge zu Höllenfeuer-/Dämonologie-Fertigkeiten. Passt es, wird der Aspekt draufgeprägt statt das Item zerlegt.",
+      "stand": "2026-09-25",
+      "rezepte": [
+        "reroll-affixwerte",
+        "affix-hinzufuegen"
+      ]
+    },
+    {
+      "id": "basis-weiss-schwert-brust",
+      "trifft": {
+        "typ": "ausruestung",
+        "seltenheit": [
+          "gewöhnlich"
+        ],
+        "itemTyp": [
+          "Schwert",
+          "Brustschutz"
+        ]
+      },
+      "suchbegriffe": [
+        "weißes schwert",
+        "white sword",
+        "weiße brust",
+        "white chest",
+        "common sword",
+        "craft basis"
+      ],
+      "verdikt": "BEHALTEN",
+      "begruendung": "Craft-Basis. Weißes Schwert für Craft Unique (Chance auf Elegie), weißer Brustschutz für Stealth und Enigma. Die Gegenstandsmacht des Ergebnisses kommt von der Basis – vermachte Basis gibt ein 900er Ergebnis.",
+      "stand": "2026-09-25",
+      "rezepte": [
+        "craft-unique",
+        "runenwort"
+      ]
+    },
+    {
+      "id": "basis-weiss-sonstiges",
+      "trifft": {
+        "typ": "ausruestung",
+        "seltenheit": [
+          "gewöhnlich"
+        ]
+      },
+      "suchbegriffe": [
+        "weißes item",
+        "white item",
+        "common item"
+      ],
+      "verdikt": "WÜRFELN",
+      "begruendung": "Craft Unique wandelt jedes weiße Teil in ein zufälliges Unique desselben Typs. Nur lohnend, wenn der Unique-Pool für diesen Slot klein ist. Sonst zerlegen.",
+      "stand": "2026-09-25",
+      "rezepte": [
+        "craft-unique",
+        "affix-entfernen"
+      ]
+    },
+    {
+      "id": "item-selten-aspektbasis",
+      "trifft": {
+        "typ": "ausruestung",
+        "seltenheit": [
+          "selten"
+        ],
+        "itemTyp": [
+          "Helm",
+          "Brustschutz",
+          "Stiefel",
+          "Ring"
+        ]
+      },
+      "suchbegriffe": [
+        "gelber helm",
+        "rare helm",
+        "seltener ring",
+        "rare ring",
+        "gelbes item",
+        "yellow item",
+        "aspekt basis"
+      ],
+      "verdikt": "BEHALTEN",
+      "begruendung": "Basis für Upgrade to Legendary. Mit Abstimmungsprisma grenzt du die Aspekt-Kategorie ein – der einzige gezielte Weg zu einem fehlenden Aspekt. Helm, Brust und Stiefel für Vielseitigkeit (Sadistic), Ringe für die Ring-Aspekte.",
+      "stand": "2026-09-25",
+      "rezepte": [
+        "upgrade-legendary"
+      ]
+    },
+    {
+      "id": "item-selten-sonstiges",
+      "trifft": {
+        "typ": "ausruestung",
+        "seltenheit": [
+          "selten",
+          "magisch"
+        ]
+      },
+      "suchbegriffe": [
+        "seltenes item",
+        "magisches item",
+        "magic item"
+      ],
+      "verdikt": "ZERLEGEN",
+      "begruendung": "Gibt Verhüllte Kristalle und Eisenbrocken. Vorher kurz auf Maximales Leben und Willenskraft schauen – ein gutes gelbes Teil mit dem richtigen Aspekt geprägt ist einem schlechten Legendary überlegen.",
+      "stand": "2026-09-25"
+    },
+    {
+      "id": "charm-set-eigenes",
+      "trifft": {
+        "typ": "zauber",
+        "set": "Abaddon's Flesh"
+      },
+      "suchbegriffe": [
+        "set charm",
+        "set zauber",
+        "abaddon",
+        "abaddons fleisch"
+      ],
+      "verdikt": "BEHALTEN",
+      "begruendung": "Dein Set. Doppelte per Reroll Set Charm auf ein fehlendes Symbol drehen – das Set bleibt gleich, nur das Symbol wechselt. Der 5er-Bonus hängt an der Anzahl der Teile, nicht an ihrer Stärke.",
+      "stand": "2026-09-25",
+      "rezepte": [
+        "reroll-set-charm",
+        "reroll-affixwerte"
+      ]
+    },
+    {
+      "id": "charm-set-fremd",
+      "trifft": {
+        "typ": "zauber",
+        "setFremd": true
+      },
+      "suchbegriffe": [
+        "fremder set zauber",
+        "anderes set",
+        "foreign set charm"
+      ],
+      "verdikt": "WÜRFELN",
+      "begruendung": "3 zu 1 Transmutation gibt einen zufälligen Set-Zauber – auch das Set ist zufällig. Ein Lostopf auf Abaddon's Flesh. Bei drei vermachten Zaubern ist das Ergebnis garantiert vermacht.",
+      "stand": "2026-09-25",
+      "schwelle": {
+        "menge": 3,
+        "einheit": "Set-Zauber",
+        "text": "Ab 3 Stück transmutieren – bis dahin sammeln."
+      },
+      "rezepte": [
+        "transmutation-3-1"
+      ]
+    },
+    {
+      "id": "charm-unique",
+      "trifft": {
+        "typ": "zauber",
+        "seltenheit": [
+          "einzigartig"
+        ]
+      },
+      "suchbegriffe": [
+        "unique charm",
+        "einzigartiger zauber"
+      ],
+      "verdikt": "BEHALTEN",
+      "begruendung": "Wird für Craft Unique Charm gebraucht – drei einzigartige Zauber plus ein Unique-Item ergeben einen neuen einzigartigen Zauber.",
+      "stand": "2026-09-25",
+      "schwelle": {
+        "menge": 3,
+        "einheit": "einzigartige Zauber",
+        "text": "3 Stück plus ein Unique-Item ergeben einen neuen einzigartigen Zauber."
+      },
+      "rezepte": [
+        "craft-unique-charm"
+      ]
+    },
+    {
+      "id": "charm-magisch-selten",
+      "trifft": {
+        "typ": "zauber",
+        "seltenheit": [
+          "magisch",
+          "selten"
+        ]
+      },
+      "suchbegriffe": [
+        "blauer zauber",
+        "gelber zauber",
+        "magic charm",
+        "rare charm"
+      ],
+      "verdikt": "BEHALTEN",
+      "begruendung": "Solange das Set nicht komplett ist, sind gute Übergangswerte mehr wert als Harz. Achte auf Ränge zu Höllenfeuer- oder Dämonologie-Fertigkeiten und Maximales Leben. Nur echten Überschuss beim Okkultisten verwerten.",
+      "stand": "2026-09-25",
+      "rezepte": [
+        "reroll-affixwerte"
+      ]
+    },
+    {
+      "id": "siegel-legendaer",
+      "trifft": {
+        "typ": "siegel",
+        "seltenheit": [
+          "legendär"
+        ],
+        "plaetze": 5
+      },
+      "suchbegriffe": [
+        "siegel",
+        "seal",
+        "5 platz siegel",
+        "6 platz siegel"
+      ],
+      "verdikt": "WÜRFELN",
+      "begruendung": "Überzählige 5-Platz-Siegel 3 zu 1 transmutieren – Chance auf ein 6-Platz-Siegel. Ein sechster Zauberplatz ist mehr wert als fünf Zauber von 850 auf 900 zu heben.",
+      "stand": "2026-09-25",
+      "schwelle": {
+        "menge": 3,
+        "einheit": "legendäre 5-Platz-Siegel",
+        "text": "Ab 3 Stück transmutieren – bis dahin sammeln. Echten Überschuss darüber hinaus kann man verkaufen, laut Farm-Guide die beste Goldquelle."
+      },
+      "rezepte": [
+        "transmutation-3-1",
+        "reroll-affixwerte"
+      ]
+    },
+    {
+      "id": "splitter-duplikat",
+      "trifft": {
+        "typ": "splitter",
+        "duplikat": true
+      },
+      "suchbegriffe": [
+        "splitter",
+        "splinter",
+        "seelenscherbe",
+        "soul splinter"
+      ],
+      "verdikt": "WÜRFELN",
+      "begruendung": "Fünf gleiche Splitter derselben Seltenheit ergeben einen der nächsthöheren Stufe. Die Stufen unterscheiden sich massiv – die Mutter gibt auf niedriger Stufe 250 physischen Widerstand, auf hoher 4.375.",
+      "stand": "2026-09-25",
+      "schwelle": {
+        "menge": 5,
+        "einheit": "gleiche Splitter derselben Seltenheit",
+        "text": "Ab 5 Stück verschmelzen – die Stufen unterscheiden sich massiv."
+      },
+      "rezepte": [
+        "amalgam-splitter"
+      ]
+    },
+    {
+      "id": "edelstein-fragment-ungenutzt",
+      "trifft": {
+        "typ": "edelsteinfragment",
+        "nichtImBuild": true
+      },
+      "suchbegriffe": [
+        "fragment",
+        "edelsteinfragment",
+        "gem fragment",
+        "smaragd",
+        "amethyst",
+        "topas",
+        "diamant"
+      ],
+      "verdikt": "WÜRFELN",
+      "begruendung": "Beim Juwelenschmied per Schmuckhandwerk in Rubin- oder Saphir-Fragmente umwandeln. Umwandlungsrate im Fenster prüfen, ist nicht 1 zu 1.",
+      "stand": "2026-09-25"
+    },
+    {
+      "id": "fallback",
+      "trifft": {
+        "typ": "*"
+      },
+      "suchbegriffe": [],
+      "verdikt": "",
+      "begruendung": "Kein Eintrag und keine Regel trifft. Noch nicht erfasst – im Spiel den Tooltip lesen, dort steht bei Materialien auch die Quelle.",
       "stand": "2026-09-25"
     }
   ],
   "rezepte": [
     {
+      "id": "craft-unique",
+      "name_de": "Einzigartiges herstellen",
+      "name_en": "Craft Unique",
+      "input": [
+        {
+          "name_de": "Gewöhnliches Ausrüstungsteil",
+          "name_en": "Common Item",
+          "menge": 1
+        }
+      ],
+      "kosten": [
+        {
+          "name_de": "Verbesserter Urstaub",
+          "name_en": "Enhanced Primordial Dust",
+          "menge": 1
+        },
+        {
+          "name_de": "Roher Urstaub",
+          "name_en": "Raw Primordial Dust",
+          "menge": 10
+        }
+      ],
+      "ergebnis": "Zufälliges Einzigartiges desselben Item-Typs",
+      "notiz": "Gegenstandsmacht kommt von der Basis. Schwert-Pool Hexenmeister: Elegie, In-Geom, Klinge der lodernden Sicht – etwa 1 zu 3. Hosen-Pool über 6, deshalb lohnt Temerity über den Würfel weniger."
+    },
+    {
+      "id": "upgrade-legendary",
+      "name_de": "Auf legendär aufwerten",
+      "name_en": "Upgrade to Legendary",
+      "input": [
+        {
+          "name_de": "Seltenes Ausrüstungsteil",
+          "name_en": "Rare Item",
+          "menge": 1
+        }
+      ],
+      "kosten": [
+        {
+          "name_de": "Reiner Urstaub",
+          "name_en": "Pure Primordial Dust",
+          "menge": 1
+        },
+        {
+          "name_de": "Roher Urstaub",
+          "name_en": "Raw Primordial Dust",
+          "menge": 10
+        },
+        {
+          "name_de": "Abstimmungsprisma (optional)",
+          "name_en": "Tuning Prism (optional)",
+          "menge": 1
+        }
+      ],
+      "ergebnis": "Zufälliger legendärer Aspekt",
+      "notiz": "Ohne Prisma würfelst du über alle Kategorien. Pragmatisches Abstimmungsprisma zielt auf Mobilität und Vielseitigkeit – damit auf Sadistic."
+    },
+    {
+      "id": "runenwort",
+      "name_de": "Runenwort (verstecktes Rezept)",
+      "name_en": "Runeword (hidden recipe)",
+      "input": [
+        {
+          "name_de": "Gewöhnliches Basis-Item + passende Runen",
+          "name_en": "Common base item + matching runes",
+          "menge": 1
+        }
+      ],
+      "kosten": [],
+      "ergebnis": "Fertiges Runenwort-Unique",
+      "notiz": "Kein eigener Menüpunkt. Basis und Runen einlegen, dann erscheint ein Rezept mit ???. Stealth = weißer Brustschutz + Tal + Eth. Enigma = weißer Brustschutz + Jah + Ith + Ber. Keine Sockel am Basis-Item nötig. Gegenstandsmacht kommt von der Basis."
+    },
+    {
+      "id": "amalgam-bosstrophaee",
+      "name_de": "Verschmelzen: Bosstrophäen",
+      "name_en": "Amalgamation: Boss Trophies",
+      "input": [
+        {
+          "name_de": "Gleiche Bosstrophäe",
+          "name_en": "Same Boss Trophy",
+          "menge": 5
+        }
+      ],
+      "kosten": [],
+      "ergebnis": "Garantiertes Einzigartiges aus der Beutetabelle dieses Bosses",
+      "notiz": "Garantiert ein Unique dieses Bosses, nicht ein bestimmtes."
+    },
+    {
+      "id": "amalgam-splitter",
+      "name_de": "Verschmelzen: Splitter",
+      "name_en": "Amalgamation: Splinters",
+      "input": [
+        {
+          "name_de": "Gleicher Splitter derselben Seltenheit",
+          "name_en": "Same splinter, same rarity",
+          "menge": 5
+        }
+      ],
+      "kosten": [],
+      "ergebnis": "1 Splitter der nächsthöheren Stufe"
+    },
+    {
+      "id": "amalgam-runen",
+      "name_de": "Verschmelzen: Runen",
+      "name_en": "Amalgamation: Runes",
+      "input": [
+        {
+          "name_de": "Runen gleicher Qualität",
+          "name_en": "Runes of same quality",
+          "menge": 5
+        }
+      ],
+      "kosten": [],
+      "ergebnis": "1 Rune der nächsthöheren Qualität"
+    },
+    {
+      "id": "amalgam-eskalationssiegel",
+      "name_de": "Verschmelzen: Eskalationssiegel",
+      "name_en": "Amalgamation: Escalation Sigil",
+      "input": [
+        {
+          "name_de": "Alptraumsiegel",
+          "name_en": "Nightmare Sigil",
+          "menge": 5
+        }
+      ],
+      "kosten": [],
+      "ergebnis": "1 Eskalationssiegel"
+    },
+    {
+      "id": "transmutation-3-1",
+      "name_de": "3 zu 1 Transmutation",
+      "name_en": "3 to 1 Transmutation",
+      "input": [
+        {
+          "name_de": "Gleicher Item-Typ (Ausrüstung, Talisman oder Rune)",
+          "name_en": "Same item type",
+          "menge": 3
+        }
+      ],
+      "kosten": [],
+      "ergebnis": "Zufälliges neues Item desselben Typs",
+      "notiz": "Drei vermachte Gegenstände ergeben garantiert ein vermachtes Ergebnis."
+    },
+    {
+      "id": "reroll-set-charm",
+      "name_de": "Set-Talismanzauber neu auswürfeln",
+      "name_en": "Reroll Set Charm",
+      "input": [
+        {
+          "name_de": "Set-Zauber",
+          "name_en": "Set Charm",
+          "menge": 1
+        }
+      ],
+      "kosten": [
+        {
+          "name_de": "Roher Urstaub",
+          "name_en": "Raw Primordial Dust",
+          "menge": 25
+        },
+        {
+          "name_de": "Erfülltes Horadrisches Harz",
+          "name_en": "Infused Horadric Resin",
+          "menge": 50
+        }
+      ],
+      "ergebnis": "Anderer Zauber aus demselben Set",
+      "notiz": "Kann wieder ein Duplikat sein. Das Set bleibt fix, das Symbol nicht. Gegenstandsmacht bleibt vermutlich gleich – 850 rein, 850 raus."
+    },
+    {
+      "id": "recycle-uniques",
+      "name_de": "Einzigartige zurückführen",
+      "name_en": "Recycle Uniques",
+      "input": [
+        {
+          "name_de": "Dasselbe Einzigartige",
+          "name_en": "Same unique",
+          "menge": 3
+        }
+      ],
+      "kosten": [],
+      "ergebnis": "Aufgewertete Version",
+      "notiz": "Bei Stealth: Entrinnen wird zum Teleport der Zauberin für 33 Primärressource."
+    },
+    {
+      "id": "affix-entfernen",
+      "name_de": "Affix entfernen",
+      "name_en": "Remove Affix",
+      "input": [
+        {
+          "name_de": "Ausrüstungsteil",
+          "name_en": "Equipment item",
+          "menge": 1
+        }
+      ],
+      "kosten": [
+        {
+          "name_de": "Veredelter Urstaub",
+          "name_en": "Refined Primordial Dust",
+          "menge": 1
+        }
+      ],
+      "ergebnis": "Item mit einem Affix weniger",
+      "notiz": "So stufst du ein gelbes Item bis auf Weiß herunter, um eine Craft-Basis zu erzeugen."
+    },
+    {
       "id": "reroll-affixwerte",
-      "name_de": "Affixwerte neu würfeln",
-      "name_en": "",
-      "input": "",
-      "kosten": "",
-      "ergebnis": "Neue Werte für die vorhandenen Affixe. Große Affixe, Verzauberungen, Härtungen und Transfigurationen bleiben erhalten.",
-      "notiz": "",
-      "stand": "2026-09-25"
+      "name_de": "Erneutes Auswürfeln von Affixwerten",
+      "name_en": "Reroll Affix Values",
+      "input": [
+        {
+          "name_de": "Ausrüstung, Zauber oder Siegel",
+          "name_en": "Equipment, charm or seal",
+          "menge": 1
+        }
+      ],
+      "kosten": [],
+      "ergebnis": "Alle Basis-Affixwerte werden neu gewürfelt",
+      "notiz": "NEU in Patch 3.2.1. Große Affixe, verzauberte Affixe, Härtungen und Transfigurationen bleiben erhalten, solange das Item modifizierbar ist. Vermachte Gegenstände behalten ihre Qualität, ein großer Affix kann erneut entstehen. Sekundäre Effekte lassen sich nicht ändern. Rettet fast fertige Items mit einem schwachen Wert."
+    },
+    {
+      "id": "affix-hinzufuegen",
+      "name_de": "Affix hinzufügen",
+      "name_en": "Add Affix",
+      "input": [
+        {
+          "name_de": "Ausrüstungsteil",
+          "name_en": "Equipment item",
+          "menge": 1
+        }
+      ],
+      "kosten": [
+        {
+          "name_de": "Grober Urstaub",
+          "name_en": "Coarse Primordial Dust",
+          "menge": 1
+        },
+        {
+          "name_de": "Roher Urstaub",
+          "name_en": "Raw Primordial Dust",
+          "menge": 5
+        },
+        {
+          "name_de": "Abstimmungsprisma",
+          "name_en": "Tuning Prism",
+          "menge": 1
+        }
+      ],
+      "ergebnis": "Ein zusätzlicher Affix",
+      "notiz": "Sinnvoll, nachdem man ein Affix entfernt hat. Unbedingt mit Abstimmungsprisma, sonst würfelt man über alle Kategorien."
+    },
+    {
+      "id": "chaotisches-neuwuerfeln",
+      "name_de": "Chaotisches Neuwürfeln",
+      "name_en": "Chaos Reroll",
+      "input": [
+        {
+          "name_de": "Ausrüstungsteil",
+          "name_en": "Equipment item",
+          "menge": 1
+        }
+      ],
+      "kosten": [
+        {
+          "name_de": "Veredelter Urstaub",
+          "name_en": "Refined Primordial Dust",
+          "menge": 1
+        },
+        {
+          "name_de": "Roher Urstaub",
+          "name_en": "Raw Primordial Dust",
+          "menge": 15
+        },
+        {
+          "name_de": "Abstimmungsprisma",
+          "name_en": "Tuning Prism",
+          "menge": 1
+        }
+      ],
+      "ergebnis": "Affix wird durch einen aus einer anderen Kategorie ersetzt",
+      "notiz": "Nur wenn dir die Kategorie eines Affixes gar nicht passt."
+    },
+    {
+      "id": "upgrade-mythic",
+      "name_de": "Auf mythisch aufwerten",
+      "name_en": "Upgrade to Mythic",
+      "input": [
+        {
+          "name_de": "Einzigartiges Item",
+          "name_en": "Unique item",
+          "menge": 1
+        }
+      ],
+      "kosten": [],
+      "ergebnis": "Mythische Version",
+      "notiz": "Seit 3.2.1 planbar statt zufällig. Zwei Haken: Das Ergebnis trägt die Markierung Hergestellt und du kannst davon nur EINS gleichzeitig tragen. Funktioniert nicht bei nicht modifizierbaren Items – ein Unique, das du später auf mythisch heben willst, darfst du vorher NICHT transfigurieren."
+    },
+    {
+      "id": "hoellenfeuerfackel",
+      "name_de": "Höllenfeuerfackeln verwerten",
+      "name_en": "Recycle Hellfire Torches",
+      "input": [
+        {
+          "name_de": "Höllenfeuerfackel",
+          "name_en": "Hellfire Torch",
+          "menge": 3
+        }
+      ],
+      "kosten": [],
+      "ergebnis": "Eine neue Höllenfeuerfackel",
+      "notiz": "Die Fackel lässt sich nicht mit den normalen Rezepten neu auswürfeln – nur über diesen Weg."
+    },
+    {
+      "id": "craft-unique-charm",
+      "name_de": "Einzigartigen Talismanzauber herstellen",
+      "name_en": "Craft Unique Charm",
+      "input": [
+        {
+          "name_de": "Einzigartige Zauber",
+          "name_en": "Unique Charms",
+          "menge": 3
+        },
+        {
+          "name_de": "Einzigartiges Item, dessen Effekt du willst",
+          "name_en": "Unique item",
+          "menge": 1
+        }
+      ],
+      "kosten": [
+        {
+          "name_de": "Verbesserter Urstaub",
+          "name_en": "Enhanced Primordial Dust",
+          "menge": 1
+        },
+        {
+          "name_de": "Roher Urstaub",
+          "name_en": "Raw Primordial Dust",
+          "menge": 50
+        },
+        {
+          "name_de": "Erfülltes Horadrisches Harz",
+          "name_en": "Infused Horadric Resin",
+          "menge": 100
+        }
+      ],
+      "ergebnis": "Der Effekt des Unique-Items als Talismanzauber",
+      "notiz": "Kostenangaben aus einem Guide-Stand vor Season 15 – im Rezeptfenster gegenprüfen."
     }
   ],
-  "farmziele": [],
+  "farmziele": [
+    {
+      "quelle_de": "Fürst Zir",
+      "quelle_en": "Lord Zir",
+      "typ": "Unterschlupf-Boss",
+      "kosten": "1x Unterschlupfschlüssel",
+      "belohnungen": [
+        {
+          "name_de": "Elegie",
+          "name_en": "Elegy"
+        },
+        "Exquisites Blut (Exquisite Blood)"
+      ],
+      "notiz": "21 Uniques in der Tabelle, davon für den Hexenmeister Elegie, Trauergesang des Odiums und Fleischgeschriebener Panzer."
+    },
+    {
+      "quelle_de": "Urivar",
+      "quelle_en": "Urivar",
+      "typ": "Unterschlupf-Boss",
+      "kosten": "1x Unterschlupfschlüssel",
+      "belohnungen": [
+        {
+          "name_de": "Infernaler Homunkulus",
+          "name_en": "Infernal Homunculus"
+        },
+        "Maske des Richters (Judicator's Mask)"
+      ]
+    },
+    {
+      "quelle_de": "Bestie im Eis",
+      "quelle_en": "Beast in the Ice",
+      "typ": "Unterschlupf-Boss",
+      "kosten": "1x Unterschlupfschlüssel",
+      "belohnungen": [
+        {
+          "name_de": "Der Götze der acht Gesichter",
+          "name_en": "The Eightfold Idol"
+        },
+        {
+          "name_de": "Sabatons des Höllenhundes",
+          "name_en": "Hellhound's Sabatons"
+        },
+        "Nadeldurchbohrte Puppe (Pincushioned Doll)"
+      ],
+      "notiz": "Dungeon Gletscherspalt (Glacial Fissure), Ödes Hochland, Zersplitterte Gipfel. Über den Schlüssel-Tooltip: Show Lair on Map."
+    },
+    {
+      "quelle_de": "Der Schlächter",
+      "quelle_en": "The Butcher",
+      "typ": "Unterschlupf-Boss",
+      "kosten": "1x Großer Unterschlupfschlüssel",
+      "belohnungen": [
+        {
+          "name_de": "Pulsierende Flamme des Molochs",
+          "name_en": "Moloch's Beating Flame"
+        }
+      ]
+    },
+    {
+      "quelle_de": "Vorbote des Hasses",
+      "quelle_en": "Harbinger of Hatred",
+      "typ": "Unterschlupf-Boss",
+      "kosten": "1x Großer Unterschlupfschlüssel",
+      "belohnungen": [
+        {
+          "name_de": "Verwegenheit",
+          "name_en": "Temerity"
+        }
+      ]
+    },
+    {
+      "quelle_de": "Bartuc",
+      "quelle_en": "Bartuc",
+      "typ": "Boss",
+      "kosten": "",
+      "belohnungen": [
+        {
+          "name_de": "Hand der Apotheose",
+          "name_en": "Hand of Apotheosis"
+        }
+      ]
+    },
+    {
+      "quelle_de": "Baal",
+      "quelle_en": "Baal",
+      "typ": "Urübel",
+      "kosten": "",
+      "belohnungen": [
+        {
+          "name_de": "Leorics Krone",
+          "name_en": "Leoric's Crown"
+        },
+        {
+          "name_de": "Stein von Jordan",
+          "name_en": "Stone of Jordan"
+        }
+      ],
+      "notiz": "Schneller als Diablo und Mephisto."
+    },
+    {
+      "quelle_de": "Astaroth",
+      "quelle_en": "Astaroth",
+      "typ": "Eskalations-Endboss",
+      "kosten": "1x Eskalationssiegel",
+      "belohnungen": [],
+      "notiz": "Phase 2: Astaroth töten, solange das Amalgam der Wut regeneriert, beendet den Kampf früh. Phase 3: nur auf Astaroth gehen, den Hund zu töten startet Phase 2 neu."
+    },
+    {
+      "quelle_de": "Höllenflut",
+      "quelle_en": "Helltide",
+      "typ": "Aktivität",
+      "kosten": "Brennender Äther",
+      "belohnungen": [
+        "Gequälte Geschenke – Truhen pro Ausrüstungsslot",
+        "Unterschlupfschlüssel (Lair Keys)",
+        "Vergessene Seelen (Forgotten Souls)"
+      ],
+      "notiz": "Dichteste Quelle für Schlüssel. Gezielte Truhen sind der direkteste Weg zu einem fehlenden Aspekt-Slot."
+    },
+    {
+      "quelle_de": "Eskalierende Alptraumdungeons",
+      "quelle_en": "Escalating Nightmare Dungeons",
+      "typ": "Aktivität",
+      "kosten": "1x Eskalationssiegel",
+      "belohnungen": [
+        "Edelsteine",
+        "Zerstreute Prismen (Scattered Prisms)",
+        "Obduzit (Obducite)",
+        "Obols",
+        "Seelenscherben über das Vorrat-Affix"
+      ],
+      "notiz": "Vorrat-Affix Diamant gibt Splitter des Höllenfeuers und des Schwarzen Seelensteins. Affix Materialien reserviert auf Ebene 3 gibt viel Handwerksmaterial. Kriegsplan-Knoten für die Affix-Wahl: Grauenvolle Wiederkehr, Wiederkehrender Alptraum, Abzweigende Pfade."
+    },
+    {
+      "quelle_de": "Unterstadt von Kurast",
+      "quelle_en": "Undercity of Kurast",
+      "typ": "Aktivität",
+      "kosten": "Tribute",
+      "belohnungen": [
+        "Abstimmungsprismen über Tribut des Einfallsreichtums",
+        "Runen über Tribut der Harmonie",
+        "Horadrim-Tribute für 6-Platz-Siegel",
+        "Erfahrung"
+      ],
+      "notiz": "Baals Scherbe der Zerstörung verbessert die Unterstadt. Kriegsplan-Knoten Fein abgestimmt erhöht die Prismen-Ausbeute bei maximaler Abstimmung."
+    },
+    {
+      "quelle_de": "Weltbosse",
+      "quelle_en": "World Bosses",
+      "typ": "Aktivität",
+      "kosten": "",
+      "belohnungen": [
+        "Zerstreute Prismen",
+        "Unterschlupfschlüssel"
+      ],
+      "notiz": "Feste Spawn-Zeiten."
+    },
+    {
+      "quelle_de": "Dunkle Zitadelle",
+      "quelle_en": "Dark Citadel",
+      "typ": "Koop-Aktivität",
+      "kosten": "",
+      "belohnungen": [
+        "Zerstreute Prismen"
+      ],
+      "notiz": "Nur im Koop lösbar, ausgelegt für 2–4 Spieler. Schwierigkeit skaliert nicht mit der Gruppengröße – zu zweit deutlich härter als zu viert."
+    },
+    {
+      "quelle_de": "Höllenhorden",
+      "quelle_en": "Infernal Hordes",
+      "typ": "Aktivität",
+      "kosten": "Höllenhordenkompass",
+      "belohnungen": [
+        "Vermachte Ausrüstung",
+        "Materialien"
+      ],
+      "notiz": "Beim Truhenkauf am Ende erst die Ausrüstungstruhe, dann die Materialtruhe."
+    },
+    {
+      "quelle_de": "Grube",
+      "quelle_en": "The Pit",
+      "typ": "Aktivität",
+      "kosten": "",
+      "belohnungen": [
+        "Glyphen-Erfahrung",
+        "Obduzit",
+        "Freischaltung höherer Qualstufen"
+      ],
+      "notiz": "Glyphen mindestens auf 25, Stufe 51 ist ein massiver Sprung."
+    }
+  ],
   "notizen": [
     {
-      "frage": "Was mache ich mit überschüssigen Set-Zaubern?",
-      "antwort": "",
+      "frage": "Woher kommen Uniques überhaupt?",
+      "antwort": "Fast nie aus der offenen Welt. Uniques sind Bossbeute und gezielt farmbar. Du kannst jeden Uber-Boss jederzeit kostenlos angreifen. Nach dem Kill erscheint ein Hort (Hoard) – den öffnest du mit dem passenden Unterschlupfschlüssel. Ohne Schlüssel hast du den Boss umsonst getötet. Zweiter Weg: fünf gleiche Bosstrophäen im Würfel ergeben ein garantiertes Unique aus der Tabelle dieses Bosses. Dritter Weg: Craft Unique auf einem weißen Item desselben Typs.",
+      "typen": [
+        "unique",
+        "material"
+      ],
+      "schlagworte": [
+        "unique",
+        "boss",
+        "hort",
+        "hoard",
+        "schlüssel",
+        "lair key",
+        "drop"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Wann sockeln, härten, vollenden?",
+      "antwort": "Sockeln sofort und immer – Edelsteine bekommst du beim Zerlegen kostenlos zurück, du kannst nichts verlieren. Aspekte prägen ebenfalls sofort, kostet nur Gold. Härten erst auf Items, die du behalten willst: die Versuche sind begrenzt und nur mit einer Schriftrolle der Wiederherstellung auffrischbar. Vollendung (Masterworking) ist der einzige wirklich teure Schritt – erst ab Qual 4–6 anfangen, vorher ist das Obduzit verbrannt. Vollendung lässt sich jederzeit zurücksetzen, das Item wird nicht zerstört.",
+      "typen": [
+        "ausruestung",
+        "edelstein",
+        "material"
+      ],
+      "schlagworte": [
+        "sockel",
+        "härten",
+        "tempering",
+        "vollendung",
+        "masterworking",
+        "obduzit"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Was passiert beim Zerlegen mit Aspekten?",
+      "antwort": "Seit Season 4 wandert der Aspekt automatisch in den Kodex der Macht, wenn du ein legendäres Item beim Schmied zerlegst – und zwar immer der höchste Wert, den du je zerlegt hast. Extrahieren beim Okkultisten braucht es nicht mehr. Vermachte (900er) Items sind besonders wertvoll, weil nur über sie die Kodex-Ränge 17 bis 21 freigeschaltet werden. Seit Lord of Hatred ist Zerlegen auch der einzige Weg – die alte Freischaltung über Dungeons gibt es nicht mehr.",
+      "typen": [
+        "ausruestung",
+        "aspekt"
+      ],
+      "schlagworte": [
+        "kodex",
+        "codex",
+        "aspekt",
+        "zerlegen",
+        "salvage",
+        "extrahieren"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Auf welche Affixe achte ich?",
+      "antwort": "Reihenfolge: vermacht (900) vor Affixen, Affixe vor Farbe. Ein gelbes Item mit den richtigen Werten wird beim Okkultisten mit einem Aspekt geprägt und ist damit legendär. Immer gut: Maximales Leben und Willenskraft. Offensiv: Krit-Chance, Krit-Schaden-Multiplikator, Verwundbar-Schaden-Multiplikator, Ränge zu Höllenfeuer-/Dämonologie-/Allen Fertigkeiten. Ressource auf Amulett und Ringen: Ressourcenkostenreduktion, Glückstreffer Primärressource. Sofort weglegen: Dornen, Überwältigen, alles mit Kälte, Blitz, Gift, Schatten oder Physisch als Schadensart. Maximales Leben ist bei diesem Build nie ein Kompromiss – Metamorphose skaliert den Schaden über das Leben. WICHTIG seit Patch 3.2.1: Ein EINZELNER Widerstand auf Ausrüstung, Zaubern und Härtungen ist siebenmal so viel wert wie 'Widerstand gegen alle Schadensarten'. Beim Würfeln und Härten also gezielt auf den Widerstand gehen, der dir fehlt, statt auf Allwiderstand. Außerdem: Ein großer Affix zählt mehr als die Seltenheit – ein magischer Ring mit großem Affix auf dem richtigen Wert kann mehr wert sein als ein legendärer mit vier mittelmäßigen, weil du fehlende Affixe im Würfel dazubaust und magische Basen dafür günstiger sind.",
+      "typen": [
+        "ausruestung"
+      ],
+      "schlagworte": [
+        "affix",
+        "affixe",
+        "stats",
+        "leben",
+        "krit",
+        "willenskraft"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Wie funktioniert Verzaubern?",
+      "antwort": "Beim Okkultisten, Funktion Verzaubern (Enchant). Du wählst einen Affix und bekommst zwei Alternativen plus die Option No Change (behalten, kostet trotzdem). Entscheidend: Pro Item ist nur EIN Affix verzauberbar. Sobald du einen angefasst hast, ist die Verzauberung dauerhaft an ihn gebunden – die anderen Affixe sind fixiert. Den verzauberten Affix erkennst du am kleinen runden Kreis vor der Zeile statt einer Raute. Also vorher überlegen, welche Zeile die schlechteste ist.",
+      "typen": [
+        "ausruestung"
+      ],
+      "schlagworte": [
+        "verzaubern",
+        "enchant",
+        "umrollen",
+        "reroll",
+        "affix"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Wie craftet man Runenwörter?",
+      "antwort": "Runenwörter haben kein eigenes Rezept im Würfel – sie sind versteckt. Du legst das Basis-Item und die Runen zusammen ein, und wenn die Kombination stimmt, erscheint ein Rezept mit ???. Sockel am Basis-Item sind nicht nötig, nur der richtige Item-Typ. Die Gegenstandsmacht des Ergebnisses kommt von der Basis – eine vermachte weiße Basis gibt ein 900er Runenwort. Stealth: weißer Brustschutz + Tal + Eth. Enigma: weißer Brustschutz + Jah + Ith + Ber. Aufwertungskette für Runen: 3x Tir ergibt Eth, 3x Eth ergibt Ith, 3x Ith ergibt Tal.",
+      "typen": [
+        "runenwort",
+        "rune"
+      ],
+      "schlagworte": [
+        "runenwort",
+        "runeword",
+        "stealth",
+        "enigma",
+        "tal",
+        "eth",
+        "craften"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Was mache ich mit Runen, die ich nicht brauche?",
+      "antwort": "Nicht verkaufen. Drei Wege: Fünf Runen gleicher Qualität im Würfel verschmelzen zu einer der nächsthöheren Stufe – so kommst du an legendäre Runen. 3 zu 1 Transmutation wertet gezielt in Richtung einer bestimmten Rune auf. Der Juwelenschmied bietet eine allgemeine 3-zu-1-Umwandlung für echten Überschuss. Faustregel: Juwelenschmied für Überschuss, Würfel wenn du ein bestimmtes Ziel hast. Mehr Runen gibt es über den Tribut der Harmonie in der Unterstadt und in den Wachenden Alpträumen.",
+      "typen": [
+        "rune"
+      ],
+      "schlagworte": [
+        "rune",
+        "runen",
+        "überschuss",
+        "blaue rune",
+        "gelbe rune",
+        "verwerten"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Was mache ich mit Talisman-Zaubern?",
+      "antwort": "Erst im Würfel verarbeiten, was sich lohnt, dann den Rest verwerten. Set-Zauber deines Sets (Abaddon's Flesh) behalten, Doppelte per Reroll Set Charm drehen. Set-Zauber fremder Sets nicht verwerten, sondern 3 zu 1 transmutieren – Lostopf auf dein Set. Einzigartige Zauber aufheben für Craft Unique Charm. Legendäre 5-Platz-Siegel 3 zu 1 für die Chance auf ein 6-Platz-Siegel. Magische und seltene Zauber erst dann verwerten, wenn dein Set komplett ist – vorher sind gute Übergangswerte mehr wert als Harz. Der Rest geht beim Okkultisten unter Talisman verwerten zu Erfülltem Horadrischem Harz. Nichts verkaufen, Gold ist nie der Engpass. Und Finger weg vom Knopf Alle Schlüssel verwerten – der zerstört auch deine Tribute.",
       "typen": [
         "zauber",
         "siegel"
       ],
       "schlagworte": [
-        "set",
+        "talisman",
         "charm",
         "zauber",
-        "talisman"
+        "set",
+        "siegel",
+        "seal",
+        "harz"
       ],
       "stand": "2026-09-25"
     },
     {
-      "id": "item-reihenfolge",
-      "frage": "In welcher Reihenfolge bearbeite ich ein Item?",
-      "antwort": "Affixe im Würfel, dann Sockel, dann Aspekt, dann Härten, dann Vollenden. Transfigurieren immer zuletzt.",
-      "reihenfolge": [
-        "affixe",
-        "sockel",
-        "aspekt",
-        "haerten",
-        "vollenden",
-        "transfigurieren"
-      ],
+      "frage": "Welche Qualstufe soll ich farmen?",
+      "antwort": "Die höchste, die du noch schnell schaffst – nicht die höchste, die du überlebst. Material und Erfahrung kommen aus Tempo. Test in einer Höllenflut: Räumst du Gruppen flüssig weg und stirbst nicht, bleib oben. Stehst du lange an Elitegruppen, geh eine Stufe runter. Bosse spielen sich etwa eine Qualstufe härter als normale Monster – beim Bossfarmen also ruhig eine Stufe drunter. Qual 1 schaltet 900er Ancestral-Gear frei, ab Qual 2 steigt die Chance darauf. Freischaltung höherer Stufen läuft über Grubenstufen, die Voraussetzung steht an der Schwierigkeitsstatue.",
       "typen": [],
       "schlagworte": [
+        "qual",
+        "torment",
+        "schwierigkeit",
+        "qualstufe",
+        "grube",
+        "pit"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Gibt es Elixiere oder Tränke zur Vorbereitung?",
+      "antwort": "Nein. Elixiere und Weihrauch wurden mit Lord of Hatred komplett aus dem saisonalen Spiel entfernt – man kann sie weder finden noch herstellen. Der Heiltrank ist der einzige Trank. Gegen physischen Schaden hilft Rüstung, physischer Widerstand (Splitter der Mutter, Schädel im Schmuck) und die Kettenaura, die Gegner schwächt.",
+      "typen": [],
+      "schlagworte": [
+        "elixier",
+        "elixir",
+        "trank",
+        "potion",
+        "alchemist",
+        "vorbereitung"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Wie funktionieren Eskalationen und was passiert beim Scheitern?",
+      "antwort": "Fünf Alptraumsiegel im Würfel ergeben ein Eskalationssiegel. Eine Serie sind drei Alptraumdungeons hintereinander plus Astaroth. Was du in den ersten drei Dungeons aufgehoben hast, gehört dir und bleibt. Aber: Verlässt du das Spiel nach dem Aktivieren, kommst du nicht mehr rein und das Siegel ist verloren. Dasselbe passiert, wenn du währenddessen ein anderes Alptraumsiegel aktivierst. Also nicht ausloggen. Qualstufe vor dem Aktivieren senken, die Serie läuft auf deiner aktuellen Stufe. Die negativen Affixe für den Astaroth-Kampf siehst du, wenn du den dritten Dungeon abschließt.",
+      "typen": [
+        "material"
+      ],
+      "schlagworte": [
+        "eskalation",
+        "escalation",
+        "astaroth",
+        "siegel",
+        "sigil",
+        "alptraumdungeon"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Was macht ein guter Loot-Filter?",
+      "antwort": "Regeln werden von oben nach unten geprüft, die erste passende gewinnt. Deshalb stehen Behalten-Regeln immer ÜBER der Ausblenden-Regel – sonst greifen sie nie. Sinnvolle Reihenfolge: 1. Craft-Basen (weiße Schwerter und Brustrüstungen) einfärben, 2. Kodex-Upgrades einfärben, 3. Große Affixe einfärben, 4. Gewöhnlich und Magisch ausblenden. Darunter nichts mehr, besonders keine bedingungslose Regel. Filter betreffen nur Ausrüstung – Materialien, Edelsteine, Gold und Härtungs-Anleitungen sind immer sichtbar. Und ausgeblendete Items liegen trotzdem am Boden und lassen sich aufheben.",
+      "typen": [],
+      "schlagworte": [
+        "lootfilter",
+        "loot filter",
+        "filter",
+        "beutefilter",
+        "ausblenden"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Was bringt Koop?",
+      "antwort": "In der offenen Welt skalieren Gegnerleben und -schaden NICHT mit der Gruppengröße – dort ist der Gewinn echt, ihr macht doppelt so schnell Fortschritt. Dazu ein Erfahrungsbonus: 5 Prozent durch Nähe, 10 Prozent in einer Gruppe. In Dungeons (auch der Grube) skalieren Leben und Schaden mit der Gruppengröße – dort ist es nicht schneller, aber sicherer. Beute ist immer individuell. Getrennt bleiben: Kriegspläne sind charaktergebunden, saisonaler Questfortschritt läuft pro Charakter, und einzigartige Items sind accountgebunden – ihr könnt euch keine Uniques schenken. Die einzige echte Koop-Aktivität ist die Dunkle Zitadelle.",
+      "typen": [],
+      "schlagworte": [
+        "koop",
+        "coop",
+        "gruppe",
+        "multiplayer",
+        "freund",
+        "skalierung"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Wie komme ich an fehlende Aspekte?",
+      "antwort": "Vier Wege, vom direktesten zum passivsten. 1. Höllenflut mit gezielten Truhen: Die Gequälten Geschenke sind auf einen Ausrüstungsslot festgelegt – du öffnest nur den Slot, auf dem der Aspekt liegen kann. 2. Kuriositätenhändler: Obols gegen zufällige Items eines gewählten Slots, dann im Würfel zu Legendär aufwerten und zerlegen. 3. Würfel Upgrade to Legendary mit Abstimmungsprisma – der einzige wirklich gezielte Weg, begrenzt durch Reinen Urstaub. 4. Einfach alles Legendäre zerlegen, der Kodex füllt sich nebenbei. Eskalationen sind stark bei Materialien, aber schwach bei gezielten Aspekten, weil du den Slot nicht beeinflussen kannst.",
+      "typen": [
+        "aspekt"
+      ],
+      "schlagworte": [
+        "aspekt",
+        "aspect",
+        "kodex",
+        "farmen",
+        "obols",
+        "purveyor"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Warum sterbe ich, obwohl ich alles one-shotte?",
+      "antwort": "Drei häufige Ursachen. 1. Metamorphose: Zerstörungsdämon verbrennt dich um 8 Prozent des maximalen Lebens über 3 Sekunden, und jeder weitere Einsatz erhöht den Selbstschaden um 5 Prozent – das schaukelt sich hoch. Der Build fängt das über Temerity plus Sadistischen Aspekt auf. Fehlt einer davon: Metamorphose zeitweise abschalten, das ist die vorgesehene Notlösung. Der Skill kommt erst ab der Midgame-Variante, in der Starter-Variante erzeugt Abodian die Demonform. 2. Fehlende Defensive: Prüfe Rüstung und Widerstände über den Tooltip im Charakterfenster, dort steht die resultierende prozentuale Reduktion. 3. Ein Item, das gegen dich arbeitet – zum Beispiel eine legendäre Kraft, die die Stählungs-Ableitung erhöht und damit deine Kettenaura entwertet. Solche Kräfte überprägst du einfach.",
+      "typen": [],
+      "schlagworte": [
+        "squishy",
+        "sterben",
+        "überleben",
+        "metamorphose",
+        "selbstschaden",
+        "defensive"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Bringt 900 statt 850 viel?",
+      "antwort": "Für die Einzigartige Kraft eines Uniques nichts – die wirkt bei 850 vollständig. Der Unterschied sind etwa 6 Prozent Gegenstandsmacht auf den normalen Affixen, plus die Chance auf Große Affixe und die Kodex-Ränge 17 bis 21 beim Zerlegen. Heißt: Ein 850er Unique jetzt anlegen ist fast immer besser als auf ein 900er warten. Bei Craft-Rezepten kommt die Gegenstandsmacht des Ergebnisses von der Basis – für ein 900er Ergebnis brauchst du also eine vermachte Basis.",
+      "typen": [
+        "ausruestung",
+        "unique"
+      ],
+      "schlagworte": [
+        "900",
+        "850",
+        "item power",
+        "gegenstandsmacht",
+        "ancestral",
+        "vermacht"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Welche Scherbe des Bösen soll ich wählen?",
+      "antwort": "Die Wahl ist erstmal bindend – zum Wechseln braucht man einen Verbrauchsgegenstand aus den Chroniken der Alpträume, und die Belohnungen an Deckards Tisch starten von vorn. Baals Scherbe der Zerstörung beeinflusst Unterstadt und Unterschlupf-Bosse und verbessert den Kriegsplan-Skill Jadene Erkenntnis – auf Rang 4 gibt es 50 Prozent mehr Erfahrungskugeln. Für einen Build, der Bosse für Uniques farmt und Paragon hochziehen will, die beste Wahl. Mephistos Scherbe des Hasses ist im späten Endgame stärker (Bonus auf Glyphen-Aufwertungen), Diablos Scherbe des Schreckens zielt auf Höllenflut und Höllenhorden.",
+      "typen": [],
+      "schlagworte": [
+        "scherbe",
+        "splinter of evil",
+        "baal",
+        "mephisto",
+        "diablo",
+        "season mechanik"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Was mache ich generell mit Überschuss? (Die Kaskade)",
+      "antwort": "Grundregel Season 15: Fast nichts ist Müll, fast alles hat einen Aufwertungspfad. Verkaufen ist die letzte Option, nicht die erste. Jedes Item durch diese sechs Fragen schicken, die erste zutreffende gewinnt. 1. Braucht es der aktive oder der Ziel-Build? Dann BEHALTEN. 2. Ist es eine Craft-Basis? Dann BEHALTEN – weiße Schwerter und Brustrüstungen, seltene Helme, Brustteile, Stiefel und Ringe sind nie Müll. 3. Gibt es einen Aufwertungspfad mit Schwelle? Dann WÜRFELN, sobald die Schwelle erreicht ist. 4. Füllt es den Kodex? Dann ZERLEGEN. 5. Ist es Materialquelle? Dann VERWERTEN. 6. Nichts davon? VERKAUFEN. Die Schwellen: 5 gleiche Bosstrophäen ergeben ein garantiertes Unique dieses Bosses, 5 gleiche Splitter derselben Seltenheit die nächste Stufe, 5 Runen gleicher Qualität die nächste Qualität, 5 Alptraumsiegel ein Eskalationssiegel, 3 legendäre 5-Platz-Siegel eine Chance auf 6 Plätze, 3 fremde Set-Zauber einen zufälligen Set-Zauber, 3 gleiche Uniques eine aufgewertete Version, 3 einzigartige Zauber plus ein Unique-Item einen neuen Zauber, 3 Höllenfeuerfackeln eine neue.",
+      "typen": [],
+      "schlagworte": [
+        "überschuss",
+        "müll",
+        "was tun",
+        "verwerten",
+        "kaskade",
+        "schwelle",
+        "surplus"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "In welcher Reihenfolge bearbeite ich ein Item?",
+      "antwort": "Die Reihenfolge entscheidet, ob du Material verbrennst oder dir das Item verbaust. 1. Basis finden – großer Affix zählt mehr als Seltenheit. 2. Affixe anpassen im Horadrimwürfel – nur bei magischen und seltenen Items. 3. Sockel setzen beim Juwelenschmied – zwei bei Zweihand, Helm, Brust und Hose. 4. Aspekt aufprägen beim Okkultisten – macht das Item legendär. 5. Härten beim Schmied – ein großer Affix ist beim Härten nur auf vermachten Items möglich. 6. Vollenden bis Stufe 25, der Abschlussbonus ist neu würfelbar. 7. Transfigurieren im Würfel – IMMER ZULETZT, danach geht nichts mehr. Und ein Unique, das du später auf mythisch heben willst, transfigurierst du gar nicht, weil die Mythic-Aufwertung bei nicht modifizierbaren Items nicht funktioniert.",
+      "typen": [
+        "ausruestung"
+      ],
+      "schlagworte": [
         "reihenfolge",
-        "verzaubern",
-        "härten",
+        "ablauf",
+        "crafting",
+        "transfigurieren",
         "vollenden",
-        "transfigurieren"
+        "sockel"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Was hat Patch 3.2.1 am Crafting geändert?",
+      "antwort": "Vier Dinge. 1. Neues Rezept Erneutes Auswürfeln von Affixwerten: würfelt die Werte aller Basis-Affixe auf Ausrüstung, Zaubern und Siegeln neu, während große Affixe, verzauberte Affixe, Härtungen und Transfigurationen erhalten bleiben. Ein fast fertiges Item mit einem schwachen Wert muss nicht mehr von vorn anfangen. 2. Mythische Items lassen sich über den Würfel planbar herstellen statt nur zufällig – aber das Ergebnis trägt die Markierung Hergestellt und davon kann man nur eins gleichzeitig tragen. 3. Verzaubern auf vermachten Items kostet nur noch 10 statt 25 Vergessene Seelen. Der Tribut der Veredelung in der Unterstadt gibt jetzt zusätzlich Vergessene Seelen, und Truhen mit Würfel- und Wiederverwertungsmaterial geben zwei- bis dreimal so viel. 4. Ein einzelner Widerstand ist siebenmal so viel wert wie Allwiderstand.",
+      "typen": [],
+      "schlagworte": [
+        "patch",
+        "3.2.1",
+        "änderungen",
+        "neu",
+        "crafting",
+        "widerstand",
+        "mythisch"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Woher bekomme ich Vergessene Seelen?",
+      "antwort": "Vier Wege, laut Farm-Guide in dieser Reihenfolge: Bosse farmen, vermachte Uniques beim Schmied verwerten, eskalierende Alptraumdungeons mit der Eigenschaft Materialvorrat, und beim Alchemisten die Transmutation Materialien veredeln. Seit Patch 3.2.1 gibt außerdem der Tribut der Veredelung in der Kurast-Unterstadt Vergessene Seelen.",
+      "typen": [
+        "material"
+      ],
+      "schlagworte": [
+        "vergessene seelen",
+        "forgotten souls",
+        "seelen",
+        "material"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Wie komme ich an ein 6-Platz-Siegel?",
+      "antwort": "Zwei Wege: seltene oder legendäre Tribute der Horadrim in der Unterstadt farmen, oder legendäre 5-Platz-Siegel 3 zu 1 im Würfel transmutieren. Ein sechster Zauberplatz ist mehr wert, als fünf Zauber von 850 auf 900 zu heben – der Set-Bonus hängt an der Anzahl der Teile, nicht an ihrer Stärke. Hast du ein 6-Platz-Siegel, kannst du sein Affix mit dem Rezept Erneutes Auswürfeln von Affixwerten so lange bearbeiten, bis der Wert passt. Und Seal of the Diamond Mind gibt den 5er- und 3er-Setbonus schon mit 4 bzw. 2 Talismanen.",
+      "typen": [
+        "siegel"
+      ],
+      "schlagworte": [
+        "siegel",
+        "seal",
+        "6 platz",
+        "6 slot",
+        "talisman",
+        "plätze"
+      ],
+      "stand": "2026-09-25"
+    },
+    {
+      "frage": "Woher bekomme ich Gold, wenn es mal knapp ist?",
+      "antwort": "Drei Wege laut Farm-Guide: überschüssige Talisman-Siegel verkaufen, eskalierende Alptraumdungeons mit der Eigenschaft Goldvorrat, und Höllenhorden, bei denen du am Ende nur die Goldtruhe öffnest. Praktisch ist Gold in Season 15 aber selten der Engpass – Material und Prismen sind es.",
+      "typen": [],
+      "schlagworte": [
+        "gold",
+        "geld",
+        "verkaufen",
+        "farmen"
       ],
       "stand": "2026-09-25"
     }
   ],
-  "quellen": [],
-  "uniqueQuellen": []
+  "_hinweisMaterialien": "Materialnamen NIE im Code hartcodieren. Einträge mit dem Feld 'bestandsschluessel' sind Materialien; der Wert ist der Schlüssel in profil.bestand. Name für die Anzeige kommt aus name_de/name_en, die Menge aus profil.bestand. Einträge mit 'engpass': true sind die kritischen."
 }

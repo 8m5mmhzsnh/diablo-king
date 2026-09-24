@@ -1,0 +1,208 @@
+{
+  "_info": "Einzelner Build als importierbare Vorlage. Fortschritt (erledigt-Haekchen) ist zurueckgesetzt - der wird nach dem Import in profil.json gefuehrt.",
+  "schemaVersion": 2,
+  "typ": "build",
+  "stand": "2026-09-25",
+  "build": {
+    "id": "midgame",
+    "name": "Midgame",
+    "klasse": "Hexenmeister (Warlock)",
+    "quelleUrl": "https://mobalytics.gg/diablo-4/builds/blazing-scream-warlock-endgame-build",
+    "datum": "2026-09-25",
+    "notiz": "Wechsel auf Schädelspalter und Metamorphose: Zerstörungsdämon. Leben stapeln, weil Metamorphose den Schaden über das maximale Leben skaliert. Erst wechseln, wenn Gegner die Schädel überleben – also beim Pushen Richtung Qual 7/8. Schädelspalter kostet deutlich mehr Zorn.",
+    "skills": [
+      "Sengender Schrei: Schädelspalter (Blazing Scream: Skull Splitter)",
+      "Finsteres Verlies: Kettenaura (Dark Prison: Chain Aura)",
+      "Amoklauf: Dämonischer Schlag (Rampage: Demonic Smash) – nicht spammen",
+      "Metamorphose: Zerstörungsdämon (Metamorphosis: Destruction Demon) – verbrennt dich",
+      "Abodian beschwören (Summon Abodian) – nur noch Bewegung",
+      "Befehligen des Gefallenen: Schilde aus Fleisch – automatisch"
+    ],
+    "slots": {
+      "kopf": {
+        "zielItem": "Leorics Krone (Leoric's Crown)",
+        "zielAspekt": "",
+        "sockel": "Splitter der Qual + Splitter des Schwarzen Seelensteins",
+        "affixe": [
+          "Primärattribut",
+          "Angriffsgeschwindigkeit",
+          "Maximales Leben",
+          "Abklingzeitreduktion"
+        ],
+        "haertung": "Maximales Leben (Worldly Endurance)",
+        "quelle": "Baal",
+        "erledigt": false
+      },
+      "brust": {
+        "zielItem": "Verstohlenheit (Stealth)",
+        "zielAspekt": "",
+        "sockel": "Nagu + Tir",
+        "affixe": [
+          "Maximales Leben",
+          "Angriffsgeschwindigkeit",
+          "Beeinträchtigungsreduktion",
+          "Ressourcenerzeugung"
+        ],
+        "haertung": "Maximales Leben (Worldly Endurance)",
+        "quelle": "Würfel: weißer Brustschutz + Tal + Eth",
+        "erledigt": false,
+        "notiz": "Nagu + Tir lösen laut Guide alle Ressourcenprobleme."
+      },
+      "handschuhe": {
+        "zielItem": "",
+        "zielAspekt": "Aspekt des höllischen Befehlshabers (Hellbent Commander Aspect)",
+        "sockel": "",
+        "affixe": [
+          "Willenskraft",
+          "Krit-Schaden-Multiplikator",
+          "Verwundbar-Schaden-Multiplikator",
+          "Maximales Leben"
+        ],
+        "haertung": "Krit-Schaden (Worldly Finesse)",
+        "quelle": "Kodex",
+        "erledigt": false
+      },
+      "hose": {
+        "zielItem": "Verwegenheit (Temerity)",
+        "zielAspekt": "",
+        "sockel": "Mot + Cir",
+        "affixe": [
+          "Primärattribut",
+          "Maximales Leben",
+          "Rüstung",
+          "Physischer Widerstand"
+        ],
+        "haertung": "Maximales Leben (Worldly Endurance)",
+        "quelle": "Vorbote des Hasses",
+        "erledigt": false,
+        "notiz": ""
+      },
+      "stiefel": {
+        "zielItem": "",
+        "zielAspekt": "Sadistischer Aspekt (Sadistic Aspect)",
+        "sockel": "",
+        "affixe": [
+          "Willenskraft",
+          "Bewegungstempo",
+          "Maximales Leben",
+          "Zornregeneration"
+        ],
+        "haertung": "Bewegungstempo (Natural Motion)",
+        "quelle": "Kodex",
+        "erledigt": false
+      },
+      "amulett": {
+        "zielItem": "Pulsierende Flamme des Molochs (Moloch's Beating Flame)",
+        "zielAspekt": "",
+        "sockel": "Splitter der Sünde",
+        "affixe": [
+          "Willenskraft",
+          "Krit-Schaden-Multiplikator",
+          "Verwundbar-Schaden-Multiplikator",
+          "Maximales Leben"
+        ],
+        "haertung": "Glückstreffer: Primärressource wiederherstellen (Worldly Stability)",
+        "quelle": "Der Schlächter",
+        "erledigt": false,
+        "notiz": ""
+      },
+      "ring1": {
+        "zielItem": "Der Götze der acht Gesichter (The Eightfold Idol)",
+        "zielAspekt": "",
+        "sockel": "Splitter des Schmerzes",
+        "affixe": [
+          "Primärattribut",
+          "Maximales Leben",
+          "Krit-Schaden-Multiplikator",
+          "Verwundbar-Schaden-Multiplikator"
+        ],
+        "haertung": "Ressourcenkostenreduktion (Worldly Stability)",
+        "quelle": "Bestie im Eis",
+        "erledigt": false,
+        "notiz": ""
+      },
+      "ring2": {
+        "zielItem": "",
+        "zielAspekt": "Aspekt der Zündung (Aspect of Ignition)",
+        "sockel": "Splitter der Mutter",
+        "affixe": [
+          "Willenskraft",
+          "Maximales Leben",
+          "Krit-Schaden-Multiplikator",
+          "Verwundbar-Schaden-Multiplikator"
+        ],
+        "haertung": "Ressourcenkostenreduktion (Worldly Stability)",
+        "quelle": "Kodex",
+        "erledigt": false
+      },
+      "waffe": {
+        "zielItem": "Elegie (Elegy)",
+        "zielAspekt": "",
+        "sockel": "Rubin",
+        "affixe": [
+          "Willenskraft",
+          "Ränge zu Sengender Schrei",
+          "Krit-Schaden",
+          "Maximales Leben"
+        ],
+        "haertung": "Angriffsgeschwindigkeit (Worldly Destruction)",
+        "quelle": "Fürst Zir",
+        "erledigt": false
+      },
+      "fokus": {
+        "zielItem": "Infernaler Homunkulus (Infernal Homunculus)",
+        "zielAspekt": "",
+        "sockel": "Rubin",
+        "affixe": [
+          "Willenskraft",
+          "Ränge zu Dämonologie-Fertigkeiten",
+          "Krit-Schaden-Multiplikator",
+          "Krit-Chance"
+        ],
+        "haertung": "Krit-Chance (Worldly Destruction)",
+        "quelle": "Urivar",
+        "erledigt": false
+      }
+    },
+    "talisman": [
+      "Mlor of Abaddon's Flesh",
+      "Phoba of Abaddon's Flesh",
+      "Berú of Abaddon's Flesh",
+      "Linta of Abaddon's Flesh",
+      "Fer of Abaddon's Flesh",
+      "Wendigo Brand (Unique Charm)"
+    ],
+    "stapeln": [
+      "Maximales Leben (skaliert Schaden über Metamorphose)",
+      "Krit-Chance",
+      "Krit-Schaden-Multiplikator",
+      "Ränge zu Höllenfeuer-/Dämonologie-/Allen Fertigkeiten"
+    ],
+    "wechselkriterien": [
+      {
+        "text": "Elegie (Elegy)",
+        "erledigt": false
+      },
+      {
+        "text": "Infernaler Homunkulus (Infernal Homunculus)",
+        "erledigt": false
+      },
+      {
+        "text": "Pulsierende Flamme des Molochs (Moloch's Beating Flame)",
+        "erledigt": false
+      },
+      {
+        "text": "Der Götze der acht Gesichter (The Eightfold Idol)",
+        "erledigt": false
+      },
+      {
+        "text": "Verwegenheit (Temerity)",
+        "erledigt": false
+      },
+      {
+        "text": "Sadistischer Aspekt – nicht offiziell, aber ohne ihn fehlt die Heilung gegen den Verbrennungsschaden",
+        "erledigt": false
+      }
+    ]
+  }
+}

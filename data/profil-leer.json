@@ -1,33 +1,47 @@
 {
-  "_info": "Leeres Profil – Vorlage. Die App legt daraus beim ersten Start dein Profil an.",
+  "_info": "Leeres Profil-Template. Kopieren, umbenennen in profil.json und ausfüllen. Die Wissensdatei wissen.json bleibt davon getrennt und kann jederzeit durch eine neuere Version ersetzt werden.",
   "schemaVersion": 2,
+  "besitzer": "",
   "charakter": {
     "name": "",
     "klasse": "",
-    "stufe": "",
-    "notiz": "",
-    "qualstufe": "",
-    "paragon": ""
+    "spielsprache": "englisch",
+    "notiz": ""
   },
-  "einstellungen": {
-    "warnTageBuildAlter": 14
-  },
-  "inventar": {
-    "kopf": null,
-    "brust": null,
-    "haende": null,
-    "beine": null,
-    "fuesse": null,
-    "amulett": null,
-    "ring1": null,
-    "ring2": null,
-    "waffe": null,
-    "fokus": null
-  },
-  "bestand": {},
-  "builds": [],
   "aktiverBuild": "",
   "zielBuild": "",
+  "einstellungen": {
+    "warnTageBuildAlter": 14,
+    "sprachausgabe": "beide"
+  },
+
+  "builds": [
+    {
+      "id": "mein-build",
+      "name": "Mein Build",
+      "klasse": "",
+      "quelleUrl": "",
+      "datum": "",
+      "notiz": "",
+      "skills": [],
+      "slots": {
+        "kopf":        { "zielItem": "", "zielAspekt": "", "sockel": "", "affixe": [], "haertung": "", "quelle": "", "erledigt": false, "notiz": "" },
+        "brust":       { "zielItem": "", "zielAspekt": "", "sockel": "", "affixe": [], "haertung": "", "quelle": "", "erledigt": false, "notiz": "" },
+        "handschuhe":  { "zielItem": "", "zielAspekt": "", "sockel": "", "affixe": [], "haertung": "", "quelle": "", "erledigt": false, "notiz": "" },
+        "hose":        { "zielItem": "", "zielAspekt": "", "sockel": "", "affixe": [], "haertung": "", "quelle": "", "erledigt": false, "notiz": "" },
+        "stiefel":     { "zielItem": "", "zielAspekt": "", "sockel": "", "affixe": [], "haertung": "", "quelle": "", "erledigt": false, "notiz": "" },
+        "amulett":     { "zielItem": "", "zielAspekt": "", "sockel": "", "affixe": [], "haertung": "", "quelle": "", "erledigt": false, "notiz": "" },
+        "ring1":       { "zielItem": "", "zielAspekt": "", "sockel": "", "affixe": [], "haertung": "", "quelle": "", "erledigt": false, "notiz": "" },
+        "ring2":       { "zielItem": "", "zielAspekt": "", "sockel": "", "affixe": [], "haertung": "", "quelle": "", "erledigt": false, "notiz": "" },
+        "waffe":       { "zielItem": "", "zielAspekt": "", "sockel": "", "affixe": [], "haertung": "", "quelle": "", "erledigt": false, "notiz": "" },
+        "fokus":       { "zielItem": "", "zielAspekt": "", "sockel": "", "affixe": [], "haertung": "", "quelle": "", "erledigt": false, "notiz": "" }
+      },
+      "talisman": [],
+      "stapeln": [],
+      "wechselkriterien": []
+    }
+  ],
+
   "sammelliste": [],
   "offeneAufgaben": [],
   "abweichungen": []

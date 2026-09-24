@@ -1,0 +1,8 @@
+# Persönliches Profil – jeder hat seine eigene, sie liegt nie im Repo
+data/profil.json
+
+# Icons (lokal erzeugt)
+icons/*.png
+icons/*.webp
+
+node_modules/

@@ -11,9 +11,15 @@ const wissen = {
     { id: 'einzigartig', name_de: 'Einzigartig', name_en: 'Unique', synonyme: ['unique', 'braun', 'gold'] },
     { id: 'vermacht', name_de: 'Vermacht', name_en: 'Ancestral', synonyme: ['900', 'ancestral'] },
   ],
-  eintraege: [],
+  eintraege: [
+    { name_de: 'Testschwert', name_en: 'Test Sword', typ: 'unique', slot: 'waffe', quelle: 'Fürst Test (Lord Test)' },
+    { name_de: 'Zerstreutes Prisma', name_en: 'Scattered Prism', typ: 'material', bestandsschluessel: 'Scattered Prism', engpass: true },
+    { name_de: 'Obduzit', name_en: 'Obducite', typ: 'material', bestandsschluessel: 'Obducite' },
+    { name_de: 'Vergessene Seelen', name_en: 'Forgotten Soul', typ: 'material', bestandsschluessel: 'Forgotten Souls', engpass: true },
+    { name_de: 'Schriftrolle der Wiederherstellung', name_en: 'Scroll of Restoration', typ: 'material', bestandsschluessel: 'Scroll of Restoration', engpass: true },
+  ],
   rezepte: [{ id: 'reroll-affixwerte', name_de: 'Affixwerte neu würfeln' }],
-  farmziele: [{ quelle_de: 'Testboss', typ: 'Boss', belohnungen: ['Testschwert'] }],
+  farmziele: [{ quelle_de: 'Fürst Test', quelle_en: 'Lord Test', typ: 'Unterschlupf-Boss', kosten: '1x Schlüssel', belohnungen: ['Anderes Teil'] }],
   notizen: [{ id: 'item-reihenfolge', frage: 'In welcher Reihenfolge bearbeite ich ein Item?', reihenfolge: L.STANDARD_REIHENFOLGE }],
   quellen: [],
   uniqueQuellen: [],
@@ -85,7 +91,9 @@ test('Nicht Zielitem und nicht vermacht → Ersetzen, KEINE Härtungs- oder Voll
   const r = run(item({ name: 'Anderes Schwert', seltenheit: 'legendär' }));
   assert.equal(kat(r, 'ersetzen').length, 1);
   assert.match(kat(r, 'ersetzen')[0].text, /Ersetzen durch Testschwert/);
-  assert.deepEqual(kat(r, 'ersetzen')[0].quellen.map(q => q.text), ['Testboss [Boss]']);
+  const q = kat(r, 'ersetzen')[0].quellen;
+  assert.deepEqual(q.map(x => x.text), ['Fürst Test (Lord Test)', 'Fürst Test (Lord Test) [Unterschlupf-Boss]']);
+  assert.equal(q[1].farm.kosten, '1x Schlüssel');
   assert.equal(kat(r, 'haerten').length, 0);
   assert.equal(kat(r, 'vollenden').length, 0);
   assert.ok(r.infos.some(i => i.text === L.TEXT.nichtHaerten));
@@ -109,6 +117,7 @@ test('Qualstufe 6 und Keeper → Vollenden mit Obduzit', () => {
   const r = run(item());
   assert.equal(kat(r, 'vollenden').length, 1);
   assert.equal(kat(r, 'vollenden')[0].material.de, 'Obduzit');
+  assert.equal(kat(r, 'vollenden')[0].material.bestand, null, 'Bestand unbekannt');
 });
 
 test('Leerer Slot → Zielitem und Quelle, keine Fehlermeldung', () => {
@@ -116,7 +125,8 @@ test('Leerer Slot → Zielitem und Quelle, keine Fehlermeldung', () => {
   assert.equal(r.aktionen.length, 1);
   assert.equal(r.aktionen[0].kategorie, 'beschaffen');
   assert.match(r.aktionen[0].text, /Testschwert/);
-  assert.deepEqual(r.aktionen[0].quellen.map(q => q.text), ['Testboss [Boss]']);
+  assert.equal(r.aktionen[0].quellen[0].text, 'Fürst Test (Lord Test)');
+  assert.equal(r.aktionen[0].quellen[1].farm.kosten, '1x Schlüssel');
 });
 
 test('Leerer Slot ohne Build-Ziel → nur Info', () => {
@@ -144,7 +154,7 @@ test('Fehlender Zielaffix → schlechteste Zeile umrollen (in keinem Build gefra
 test('Vermachtes Item: Verzaubern kostet Vergessene Seelen', () => {
   const r = run(item({ vermacht: true, affixe: [{ text: 'Thorns', wert: '1' }] }));
   assert.equal(kat(r, 'affixe')[0].material.de, 'Vergessene Seelen');
-  assert.ok(r.infos.some(i => i.text === L.TEXT.seelen));
+  assert.ok(r.infos.some(i => i.text === L.TEXT.seelen('Vergessene Seelen')));
 });
 
 test('Nur schwache Werte → Rezept reroll-affixwerte', () => {
@@ -160,8 +170,10 @@ test('Falscher Sockelinhalt → ersetzen, fehlender Sockel → Prisma', () => {
   const r1 = run(item({ sockel: [{ gefuellt: true, inhalt: 'Emerald' }] }));
   assert.match(kat(r1, 'sockel')[0].text, /Emerald“ ersetzen durch „Ruby“. Der alte Edelstein ist nicht verloren/);
   const r2 = run(item({ sockel: [] }));
-  assert.match(kat(r2, 'sockel')[0].text, /Zerstreutes Prisma/);
+  assert.match(kat(r2, 'sockel')[0].text, /kostet 1 Zerstreutes Prisma/);
   assert.equal(kat(r2, 'sockel')[0].gruppe, 'material');
+  assert.equal(kat(r2, 'sockel')[0].material.en, 'Scattered Prism');
+  assert.equal(kat(r2, 'sockel')[0].material.engpass, true);
 });
 
 test('Splitter im Build ohne Sockel → Priorität hoch', () => {
@@ -171,16 +183,73 @@ test('Splitter im Build ohne Sockel → Priorität hoch', () => {
 });
 
 test('Schriftrolle im Bestand → keine Kein-Reset-Warnung', () => {
-  const r = run(item(), { bestand: { 'Schriftrolle der Wiederherstellung': 2 } });
+  const r = run(item(), { bestand: { 'Scroll of Restoration': 2 } });
   assert.equal(kat(r, 'haerten')[0].warnung, '');
 });
 
-test('Engpässe: aus eintraege typ material abgeleitet, wenn engpaesse fehlt', () => {
+test('Schriftrolle mit Bestand 0 oder null → Kein-Reset-Warnung', () => {
+  assert.equal(kat(run(item(), { bestand: { 'Scroll of Restoration': 0 } }), 'haerten')[0].warnung, L.TEXT.keinReset);
+  assert.equal(kat(run(item(), { bestand: { 'Scroll of Restoration': null } }), 'haerten')[0].warnung, L.TEXT.keinReset);
+});
+
+test('Bestand 0 → Aktion blockiert und nach unten sortiert, nicht versteckt', () => {
+  const r = run(item({ sockel: [] }), { bestand: { 'Scattered Prism': 0 } });
+  const s = kat(r, 'sockel')[0];
+  assert.equal(s.blockiert, true);
+  assert.equal(s.material.bestand, 0);
+  assert.equal(r.aktionen[r.aktionen.length - 1], s);
+  const r2 = run(item({ sockel: [] }), { bestand: { 'Scattered Prism': 2 } });
+  assert.equal(kat(r2, 'sockel')[0].blockiert, false);
+});
+
+test('Materialname kommt aus den Daten: ohne Eintrag bleibt der Schlüssel stehen', () => {
+  const m = L.material({ eintraege: [] }, {}, 'Scattered Prism', 1);
+  assert.equal(m.de, 'Scattered Prism');
+  assert.equal(m.imWissen, false);
+  assert.equal(m.bestand, null);
+});
+
+test('Engpässe: aus engpass:true, sonst aus typ material', () => {
+  assert.equal(L.engpassListe(wissen).herkunft, 'engpass');
+  assert.equal(L.engpassListe(wissen).liste.length, 3);
   const w = { eintraege: [{ name_de: 'Obduzit', name_en: 'Obducite', typ: 'material' }] };
-  const e = L.engpassListe(w);
-  assert.equal(e.abgeleitet, true);
-  assert.ok(L.istEngpass(w, L.MATERIAL.obduzit));
-  assert.ok(!L.istEngpass(w, L.MATERIAL.prisma));
+  assert.equal(L.engpassListe(w).herkunft, 'material');
+});
+
+test('Integritätsprüfung findet fehlende Rezepte, Verdikte und Bestandsschlüssel', () => {
+  const w = {
+    verdikte: [{ id: 'BEHALTEN' }], rezepte: [{ id: 'a' }],
+    eintraege: [{ name_de: 'X', verdikt: 'WEG', rezepte: ['a', 'b'] }, { name_de: 'M', bestandsschluessel: 'M1' }, { name_de: 'N', bestandsschluessel: 'N1' }],
+    regeln: [{ id: 'r', verdikt: 'BEHALTEN', rezepte: ['c'] }],
+  };
+  const r = L.pruefeIntegritaet(w, { bestand: { M1: null, Z: 3 }, builds: [{ id: 'b', slots: { hose: {}, beinkleid: {} } }], aktiverBuild: 'b', zielBuild: 'fehlt' });
+  assert.deepEqual(r.fehlendeRezepte.map(x => x.id), ['b', 'c']);
+  assert.deepEqual(r.fehlendeVerdikte.map(x => x.id), ['WEG']);
+  assert.deepEqual(r.bestandFehlt, ['N1']);
+  assert.deepEqual(r.bestandNull, ['M1']);
+  assert.deepEqual(r.bestandOhneMaterial, ['Z']);
+  assert.deepEqual(r.slotsUnbekannt, ['b.beinkleid']);
+  assert.deepEqual(r.buildsFehlen, ['zielBuild = fehlt']);
+});
+
+test('Slot-Aliase: alte Schlüssel haende/beine/fuesse werden gelesen', () => {
+  const inv = L.normalizeInventar({ haende: { name: 'A' }, beine: { name: 'B' }, fuesse: { name: 'C' } });
+  assert.equal(inv.handschuhe.name, 'A');
+  assert.equal(inv.hose.name, 'B');
+  assert.equal(inv.stiefel.name, 'C');
+});
+
+test('Katalog: kategorien.uniques.einträge mit Unterstrich-Slugs', () => {
+  const k = { kategorien: { uniques: { typ: 'unique', 'einträge': [{ slug: 'aegroms_schism', name_en: 'Aegroms Schism' }] } } };
+  assert.equal(L.findeUnique(k, "Aegrom's Schism").slug, 'aegroms_schism');
+  assert.equal(L.findeUnique(k, 'Aegroms Schism').slug, 'aegroms_schism');
+  assert.equal(L.katalogListe(k, 'uniques').length, 1);
+});
+
+test('Verdikt-Farbnamen werden auf CSS abgebildet', () => {
+  assert.equal(L.farbeCss('gruen'), '#2e9b50');
+  assert.equal(L.farbeCss('#123456'), '#123456');
+  assert.equal(L.farbeCss('quatsch'), '');
 });
 
 test('Tooltip-Parser: Name, Seltenheit, Typ, Macht, Affixe, Sockel, Härtung', () => {
@@ -221,6 +290,7 @@ test('Tooltip-Parser: Unique ohne Katalog → nichts implizit, Hinweis', () => {
   assert.equal(r.item.affixe[0].implizit, false);
   assert.match(r.implizitHinweis, /nicht in katalog\.json/);
   assert.equal(r.slot.key, 'kopf');
+  assert.match(r.implizitHinweis, /selbst markieren/);
 });
 
 test('Slot-Vorschlag: zweiter Ring geht auf Ring 2', () => {
