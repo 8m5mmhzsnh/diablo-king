@@ -1,0 +1,40 @@
+{
+  "_info": "Persönliches Profil – wird nie von einem Wissens-Update überschrieben. Beispiel: zwei leere Builds zum Ausfüllen.",
+  "schemaVersion": 2,
+  "charakter": {
+    "name": "",
+    "klasse": "",
+    "stufe": "",
+    "notiz": ""
+  },
+  "einstellungen": {
+    "warnTageBuildAlter": 14
+  },
+  "builds": [
+    {
+      "id": "aktuell",
+      "name": "Aktueller Build",
+      "klasse": "",
+      "quelleUrl": "",
+      "datum": "",
+      "notiz": "",
+      "slots": {},
+      "wechselkriterien": []
+    },
+    {
+      "id": "ziel",
+      "name": "Ziel-Build",
+      "klasse": "",
+      "quelleUrl": "",
+      "datum": "",
+      "notiz": "",
+      "slots": {},
+      "wechselkriterien": []
+    }
+  ],
+  "aktiverBuild": "aktuell",
+  "zielBuild": "ziel",
+  "sammelliste": [],
+  "offeneAufgaben": [],
+  "abweichungen": []
+}
