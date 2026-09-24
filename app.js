@@ -13,6 +13,7 @@ const FILES = {
   profil: 'data/profil.json',
   profilLeer: 'data/profil-leer.json',
   katalog: 'data/katalog.json',
+  vorlagen: 'data/builds/index.json',
 };
 const LS = {
   wissen: 'd4k2.wissen',            // Arbeitskopie wissen.json
@@ -137,7 +138,7 @@ function normalizeWissen(w) {
     s = [...map.values()];
   }
   w.seltenheitSynonyme = asArray(s).filter(x => x && x.id).map(x => ({
-    id: x.id, name_de: x.name_de || x.id, name_en: x.name_en || '', synonyme: asArray(x.synonyme),
+    id: x.id, name_de: x.name_de || (String(x.id).charAt(0).toUpperCase() + String(x.id).slice(1)), name_en: x.name_en || '', synonyme: asArray(x.synonyme),
   }));
   w.regeln = w.regeln.map((r, i) => Object.assign({ id: `regel-${i + 1}`, trifft: {}, suchbegriffe: [], ausnahmen: [] }, r));
   return w;
@@ -151,7 +152,7 @@ function normalizeBuild(b) {
   if (!b.id) b.id = newId();
   const slots = {};
   for (const s of SLOTS) {
-    const slot = Object.assign(emptySlot(), (b.slots && b.slots[s.key]) || {});
+    const slot = Object.assign(emptySlot(), slotAus(b.slots, s.key) || {});
     if (typeof slot.affixe === 'string') slot.affixe = slot.affixe.split(/\n|,/).map(x => x.trim()).filter(Boolean);
     if (!Array.isArray(slot.affixe)) slot.affixe = [];
     slot.erledigt = !!slot.erledigt;
@@ -255,9 +256,15 @@ async function loadKatalog() {
     k = lsGet(LS.katalog, null);
     state.katalogQuelle = k ? 'Arbeitskopie im Browser' : `nicht geladen (${r.error})`;
   }
-  k = Object.assign({}, k || {});
-  if (!Array.isArray(k.uniques)) k.uniques = [];
-  state.katalog = k;
+  state.katalog = Object.assign({}, k || {});
+}
+function katalogZusammenfassung() {
+  const kat = state.katalog.kategorien;
+  if (kat && typeof kat === 'object') {
+    const n = Object.keys(kat).reduce((a, k) => a + katalogListe(state.katalog, k).length, 0);
+    return `${n} Namen in ${Object.keys(kat).length} Kategorien`;
+  }
+  return `${katalogListe(state.katalog, 'uniques').length} Uniques`;
 }
 
 async function loadProfil() {
@@ -319,9 +326,6 @@ function verdiktInfo(id) {
   const v = state.wissen.verdikte.find(x => norm(x.id) === n);
   return v ? { id: v.id, farbe: v.farbe, text: v.text || '' } : { id: String(id).toUpperCase(), farbe: '', text: 'Nicht in wissen.json → verdikte' };
 }
-function safeColor(c) {
-  return /^(#[0-9a-f]{3,8}|[a-z]{3,20}|rgba?\([\d\s.,%]+\)|hsla?\([\d\s.,%deg]+\))$/i.test(c || '') ? c : '';
-}
 function textColorFor(c) {
   const m = /^#([0-9a-f]{6})/i.exec(c || '') || /^#([0-9a-f]{3})$/i.exec(c || '');
   if (!m) return '#fff';
@@ -333,7 +337,7 @@ function textColorFor(c) {
 function verdiktHtml(id, big) {
   const v = verdiktInfo(id);
   if (!v) return `<span class="verdikt v-none${big ? ' big' : ''}">KEIN VERDIKT</span>`;
-  const bg = safeColor(v.farbe) || '#5c5249';
+  const bg = farbeCss(v.farbe) || '#5c5249';
   return `<span class="verdikt${big ? ' big' : ''}" style="background:${bg};color:${textColorFor(bg)}" title="${esc(v.text)}">${esc(v.id)}</span>`;
 }
 const istVerdikt = (a, b) => norm(a) === norm(b);
@@ -554,6 +558,7 @@ function bezugDetail(bz) {
 
 function abweichungFuer(keys, regelId) {
   return state.profil.abweichungen.find(a => {
+    if (!a || !a.verdikt) return false;
     const n = norm(a.bezug);
     if (!n) return false;
     if (regelId && n === norm(regelId)) return true;
@@ -579,19 +584,13 @@ function endVerdikt(basis, abw, bz) {
   return { verdikt: v, zeilen };
 }
 
-function quellenFuer(keys, eigene) {
-  const out = [];
-  if (eigene) asArray(eigene).forEach(q => { const t = quelleText(state.wissen, q); if (t) out.push(t); });
-  for (const f of state.wissen.farmziele) {
-    const hit = asArray(f.belohnungen).some(x => { const n = norm(itemText(x)); return keys.some(k => hasWords(n, k)); });
-    if (!hit) continue;
-    const t = farmQuelle(state.wissen, f);
-    if (!t) continue;
-    const plain = norm(t.replace(/\s*\[.*\]$/, ''));
-    const dup = out.findIndex(o => { const po = norm(o.replace(/\s*\[.*\]$/, '')); return po === plain || hasWords(plain, po); });
-    if (dup >= 0) out[dup] = t; else out.push(t);
-  }
-  return out;
+/** Quellen für einen Namen: eintraege[].quelle + passende farmziele (mit Kosten). Logik in lib.js. */
+function quellenHtml(name) {
+  const q = quellenFuerName(state.wissen, name);
+  if (!q.length) return '';
+  return `<div><span class="k">Quelle</span>${q.map(x => x.farm
+    ? `<a href="#" data-act="goto-tab" data-tab="farmziele">${esc(x.text)}</a>${x.farm.kosten ? ` <span class="muted">– Kosten: ${esc(x.farm.kosten)}</span>` : ''}`
+    : esc(x.text)).join('<br>')}</div>`;
 }
 
 function rezepteFuer(keys, ids) {
@@ -637,7 +636,7 @@ function setTab(tab) {
 function renderHeader() {
   const w = state.wissen;
   const alt = istAlt(w.stand);
-  $('#wissen-meta').innerHTML = `Wissen v${esc(w.version || '?')} · Stand ${esc(w.stand || '?')}` +
+  $('#wissen-meta').innerHTML = `Wissen v${esc(w.version ?? '?')}${w.season ? ` · S${esc(w.season)}` : ''} · Stand ${esc(w.stand || '?')}` +
     (ageDays(w.stand) > 0 ? ` (vor ${ageDays(w.stand)} T.)` : '') + (alt ? ' ' + staleIcon(w.stand) : '');
   const ab = aktivBuild(), zb = zielBuild();
   $('#build-info').innerHTML =
@@ -665,6 +664,7 @@ function render() {
     case 'abweichungen': main.innerHTML = viewAbweichungen(); break;
     case 'inventar': main.innerHTML = state.invEditor ? viewInvEditor() : viewInventar(); break;
     case 'naechster': main.innerHTML = viewNaechster(); break;
+    case 'bestand': main.innerHTML = viewBestand(); break;
     default:
       if (state.eintragEditor) main.innerHTML = viewEintragEditor();
       else renderSuche(main);
@@ -681,6 +681,7 @@ function renderSuche(main) {
       <input id="q" class="search" type="search" autocomplete="off" autocapitalize="off" spellcheck="false"
         placeholder="Item, Rune, Kategorie … (DE/EN)" value="${esc(state.query)}" autofocus>
     </div>
+    ${state.wissen.warnung ? `<p class="small muted">${esc(state.wissen.warnung)}</p>` : ''}
     <div id="results"></div>`;
   const input = $('#q');
   input.addEventListener('input', () => { state.query = input.value; renderResults(); });
@@ -743,10 +744,23 @@ function zeilenHtml(zeilen) {
   return zeilen.map(z => `<div class="override ${z.art}">${esc(z.text)}</div>`).join('');
 }
 
-function extraRows(keys, quellenRoh, rezeptIds) {
+function schwelleHtml(sw) {
+  if (!sw) return '';
+  if (typeof sw !== 'object') return `<div><span class="k">Schwelle</span>${esc(sw)}</div>`;
+  return `<div><span class="k">Schwelle</span>${sw.menge != null ? `<b>ab ${esc(sw.menge)}${sw.einheit ? ' ' + esc(sw.einheit) : ''}</b>` : ''}${sw.text ? ` – ${esc(sw.text)}` : ''}</div>`;
+}
+
+function bestandHtml(e) {
+  if (!e.bestandsschluessel) return '';
+  const m = material(state.wissen, state.profil.bestand, e.bestandsschluessel, null);
+  return `<div><span class="k">Bestand</span>${m.bestand == null ? '<span class="warn-text">unbekannt</span>' : `<b>${esc(m.bestand)}</b>`}
+    ${e.engpass ? ' <span class="tag warn">Engpass</span>' : ''} <a href="#" data-act="goto-tab" data-tab="bestand">bearbeiten</a></div>`;
+}
+
+function extraRows(name, keys, rezeptIds) {
   const rows = [];
-  const quellen = quellenFuer(keys, quellenRoh);
-  if (quellen.length) rows.push(`<div><span class="k">Quelle</span>${esc(quellen.join(' · '))}</div>`);
+  const q = quellenHtml(name);
+  if (q) rows.push(q);
   for (const { r, rolle } of rezepteFuer(keys, rezeptIds)) {
     rows.push(`<div><span class="k">Würfel</span><b>${esc(bi(r.name_de || r.name, r.name_en) || r.id || 'Rezept')}</b> <span class="muted">(${esc(rolle)})</span> ${staleIcon(r.stand)}<br>
       ${r.input ? `Input: ${esc(listText(r.input))}<br>` : ''}
@@ -777,7 +791,8 @@ function cardName(e, qa, gezeigt) {
   const abw = abweichungFuer(e.keys);
   const ev = endVerdikt(basis, abw, bz);
   const typen = e.kind === 'eintrag' ? [src.typ, src.itemTyp].filter(Boolean) : [];
-  const meta = [src.typ, src.itemTyp, src.seltenheit ? seltenheitAnzeige(selKanon(src.seltenheit)) : ''].filter(Boolean);
+  const meta = [src.typ, src.itemTyp, src.kategorie, src.slot && `Slot: ${(SLOT_BY_KEY[slotKey(src.slot)] || {}).de || src.slot}`,
+    src.seltenheit ? seltenheitAnzeige(selKanon(src.seltenheit)) : ''].filter(Boolean);
 
   const rows = [];
   rows.push(`<div><span class="k">Build</span>${badgeHtml(bz)} ${esc(bezugDetail(bz))}</div>`);
@@ -785,7 +800,9 @@ function cardName(e, qa, gezeigt) {
     .map(b => ({ b, refs: buildRefs(b, e.keys) })).filter(x => x.refs.length);
   if (andere.length) rows.push(`<div><span class="k">Auch in</span>${andere.map(x => esc(`${x.b.name} (${refText(x.refs)})`)).join('; ')} <span class="muted">– weder aktiv noch Ziel</span></div>`);
   rows.push(ausnahmeVonHtml(e.keys));
-  rows.push(...extraRows(e.keys, src.quelle, src.rezepte));
+  rows.push(bestandHtml(src));
+  rows.push(schwelleHtml(src.schwelle));
+  rows.push(...extraRows(src.name_de || src.name_en || e.anzeige, e.keys, src.rezepte));
   if (src.notiz) rows.push(`<div><span class="k">Notiz</span>${esc(src.notiz)}</div>`);
 
   const leer = e.kind !== 'eintrag';
@@ -829,6 +846,13 @@ function cardRegel(r, qa, gezeigt, fallback) {
   if (ausn.length) {
     rows.push(`<div class="ausnahmen"><span class="k">Ausnahmen</span>${r.ausnahmeText ? `<b>${esc(r.ausnahmeText)}</b>` : ''}
       <ul>${ausnBz.map(({ a, bz }) => `<li>${esc(a)} ${bz.inA || bz.inZ ? badgeHtml(bz) : ''}</li>`).join('')}</ul></div>`);
+  }
+  rows.push(schwelleHtml(r.schwelle));
+  for (const id of asArray(r.rezepte)) {
+    const rz = state.wissen.rezepte.find(x => x.id === id);
+    rows.push(rz ? `<div><span class="k">Würfel</span><b>${esc(bi(rz.name_de || rz.name, rz.name_en) || rz.id)}</b>
+      ${rz.kosten ? `<br>Kosten: ${esc(listText(rz.kosten))}` : ''}${rz.ergebnis ? `<br>Ergebnis: ${esc(listText(rz.ergebnis))}` : ''}</div>`
+      : `<div><span class="k">Würfel</span><span class="warn-text">Rezept „${esc(id)}“ fehlt in wissen.json</span></div>`);
   }
   if (r.notiz) rows.push(`<div><span class="k">Notiz</span>${esc(r.notiz)}</div>`);
 
@@ -897,6 +921,8 @@ function viewBuilds() {
       if (sl.sockel) parts.push(`Sockel: ${esc(sl.sockel)}`);
       if (sl.affixe.length) parts.push(`Affixe: ${esc(sl.affixe.join(' > '))}`);
       if (sl.haertung) parts.push(`Härtung: ${esc(sl.haertung)}`);
+      if (sl.quelle) parts.push(`<span class="muted">Quelle: ${esc(sl.quelle)}</span>`);
+      if (sl.notiz) parts.push(`<span class="muted">${esc(sl.notiz)}</span>`);
       if (!parts.length) return '';
       return `<tr><td>${esc(s.de)}${sl.erledigt ? ' ✓' : ''}</td><td>${parts.join('<br>')}</td></tr>`;
     }).join('');
@@ -923,6 +949,8 @@ function viewBuilds() {
         <button class="btn danger" data-act="del" data-id="${esc(b.id)}">Löschen</button>
       </div>
       ${slotRows ? `<details><summary class="small muted">Slots anzeigen</summary><table class="slots">${slotRows}</table></details>` : '<p class="small muted">Noch keine Slots ausgefüllt.</p>'}
+      ${[['skills', 'Skills'], ['talisman', 'Talisman'], ['stapeln', 'Stapeln']].filter(([k]) => asArray(b[k]).length).map(([k, l]) =>
+        `<details><summary class="small muted">${l} (${asArray(b[k]).length})</summary><ul class="affixe">${asArray(b[k]).map(x => `<li>${esc(listText(x))}</li>`).join('')}</ul></details>`).join('')}
       <h3>Wechselkriterien ${wk.length ? `<span class="muted small">${wkDone}/${wk.length}</span>` : ''}</h3>
       ${wk.length ? `
         <div class="progress"><span style="width:${Math.round(wkDone / wk.length * 100)}%"></span></div>
@@ -938,7 +966,10 @@ function viewBuilds() {
     <div class="btn-row">
       <button class="btn primary" data-act="new">+ Neuer Build</button>
       <button class="btn" data-act="open-import">Guide-Text einfügen</button>
+      <button class="btn" data-act="vorlagen">Build-Vorlage importieren</button>
+      <label class="btn">Build-Datei laden<input type="file" id="file-build" accept=".json,application/json" hidden></label>
     </div>
+    <div id="vorlagen"></div>
     ${cards || '<div class="msg info">Noch keine Builds. Lege einen an oder füge Text aus einem Build-Guide ein.</div>'}`;
 }
 
@@ -965,9 +996,9 @@ function viewImport() {
 const SLOT_PATTERNS = [
   ['kopf', /^(helm|helmet|head|kopf|kopfschutz|haube)$/],
   ['brust', /^(chest|chest armor|chest armour|body|body armor|torso|brust|brustrustung|brustpanzer|rustung)$/],
-  ['haende', /^(gloves|glove|hands|gauntlets|handschuhe|hande)$/],
-  ['beine', /^(pants|legs|leggings|trousers|beine|hose|beinschutz)$/],
-  ['fuesse', /^(boots|feet|shoes|fusse|stiefel|schuhe)$/],
+  ['handschuhe', /^(gloves|glove|hands|gauntlets|handschuhe|hande)$/],
+  ['hose', /^(pants|legs|leggings|trousers|beine|hose|beinschutz)$/],
+  ['stiefel', /^(boots|feet|shoes|fusse|stiefel|schuhe)$/],
   ['amulett', /^(amulet|amulett|neck|necklace|halskette)$/],
   ['ring1', /^(ring 1|ring one|ring i|erster ring)$/],
   ['ring2', /^(ring 2|ring two|ring ii|zweiter ring)$/],
@@ -1153,12 +1184,7 @@ function saveEditor() {
 function slotQuelle(sl) {
   if (sl.quelle) return sl.quelle;
   const out = [];
-  for (const t of [sl.zielItem, sl.zielAspekt]) {
-    if (!t) continue;
-    const n = norm(t);
-    const e = INDEX.find(x => x.kind === 'eintrag' && x.keys.some(k => hasWords(n, k)));
-    out.push(...quellenFuer(e ? e.keys : [n], e ? e.src.quelle : null));
-  }
+  for (const t of [sl.zielItem, sl.zielAspekt]) if (t) out.push(...quellenFuerName(state.wissen, t).map(q => q.text));
   return [...new Set(out)].join(' · ');
 }
 
@@ -1245,9 +1271,14 @@ function viewFarmziele() {
       </div>
     </div>`).join('');
   if (q.length) {
-    html += `<h2>Quellen</h2><div class="card">${q.map(x => `<div class="check"><span class="ct">
-      <b>${esc(bi(x.name_de || x.name, x.name_en) || x.id)}</b>${x.typ ? ` <span class="res-typ">${esc(x.typ)}</span>` : ''} ${staleIcon(x.stand)}
-      ${x.notiz ? `<br><span class="small muted">${esc(x.notiz)}</span>` : ''}</span></div>`).join('')}</div>`;
+    html += `<h2>Wissensquellen</h2><p class="small muted">Woher das Wissen in wissen.json stammt.</p><div class="card">${q.map(x => {
+      const url = safeUrl(x.url);
+      const name = bi(x.name_de || x.name, x.name_en) || x.id || x.url;
+      return `<div class="check"><span class="ct">
+      ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(name)}</a>` : `<b>${esc(name)}</b>`}${x.typ ? ` <span class="res-typ">${esc(x.typ)}</span>` : ''} ${staleIcon(x.stand)}
+      ${x.stand ? `<span class="small muted"> · Stand ${esc(x.stand)}</span>` : ''}
+      ${x.notiz ? `<br><span class="small muted">${esc(x.notiz)}</span>` : ''}</span></div>`;
+    }).join('')}</div>`;
   }
   return html;
 }
@@ -1349,24 +1380,41 @@ function saveEintrag() {
    Ansicht: Abweichungen
    ================================================================ */
 
+const istVerdiktAbweichung = a => !!(a && (a.bezug || a.verdikt));
+
 function viewAbweichungen() {
-  const list = state.profil.abweichungen;
+  const list = state.profil.abweichungen.map((a, i) => ({ a, i }));
+  const guide = list.filter(x => !istVerdiktAbweichung(x.a));
+  const eigene = list.filter(x => istVerdiktAbweichung(x.a));
   const verd = state.wissen.verdikte.map(v => `<option value="${esc(v.id)}">${esc(v.id)}</option>`).join('');
   const bezugOptionen = [
     ...INDEX.filter(e => e.kind === 'eintrag').map(e => e.anzeige),
     ...state.wissen.regeln.map(r => r.id),
   ].map(x => `<option value="${esc(x)}">`).join('');
+  const feldName = k => k.charAt(0).toUpperCase() + k.slice(1);
   return `
-    <h2>Eigene Abweichungen</h2>
-    <p class="small muted">Hier überstimmst du das Wissen für dich persönlich. Gilt für einen Eintrag (Name) oder eine Regel (ID).
-      Wird in profil.json gespeichert und bei Wissens-Updates nie überschrieben. Build-Bedarf hat trotzdem Vorrang (BEHALTEN).</p>
-    ${list.length ? list.map((a, i) => `<div class="card">
+    <h2>Guide-Abweichungen</h2>
+    <p class="small muted">Wo sich die Quellen widersprechen und wofür du dich entschieden hast (profil.json → abweichungen).</p>
+    ${guide.length ? guide.map(({ a, i }) => `<div class="card">
+      <div class="res-name">${esc(a.thema || '(ohne Thema)')} ${staleIcon(a.stand)}</div>
+      <div class="res-rows">
+        ${Object.entries(a).filter(([k]) => !['thema', 'entscheidung', 'stand'].includes(k))
+          .map(([k, v]) => `<div><span class="k">${esc(feldName(k))}</span>${esc(listText(v))}</div>`).join('')}
+        ${a.entscheidung ? `<div><span class="k">Entscheidung</span><b>${esc(a.entscheidung)}</b></div>` : ''}
+      </div>
+      <div class="btn-row"><button class="btn danger" data-act="abw-del" data-i="${i}">Löschen</button></div>
+    </div>`).join('') : '<p class="small muted">Keine.</p>'}
+
+    <h2>Eigene Verdikte</h2>
+    <p class="small muted">Hier überstimmst du das Wissen für dich persönlich – für einen Eintrag (Name) oder eine Regel (ID).
+      Build-Bedarf hat trotzdem Vorrang (BEHALTEN).</p>
+    ${eigene.length ? eigene.map(({ a, i }) => `<div class="card">
       <div class="res-head">${verdiktHtml(a.verdikt)} <span class="res-name">${esc(a.bezug)}</span> ${staleIcon(a.stand)}</div>
       ${a.begruendung ? `<p class="res-reason">${esc(a.begruendung)}</p>` : ''}
       <div class="small muted">${a.stand ? `Stand ${esc(a.stand)}` : ''}</div>
       <div class="btn-row"><button class="btn danger" data-act="abw-del" data-i="${i}">Löschen</button></div>
-    </div>`).join('') : '<p class="small muted">Noch keine Abweichungen.</p>'}
-    <h3>Neue Abweichung</h3>
+    </div>`).join('') : '<p class="small muted">Noch keine.</p>'}
+    <h3>Neues eigenes Verdikt</h3>
     <form id="abw-form" class="card" autocomplete="off">
       <label class="f">Bezug (Eintragsname oder Regel-ID)<input type="text" name="bezug" list="dl-bezug" required></label>
       <label class="f">Mein Verdikt<select name="verdikt">${verd}</select></label>
@@ -1379,6 +1427,20 @@ function viewAbweichungen() {
 /* ================================================================
    Ansicht: Dateien (Import/Export, Profil-Einstellungen)
    ================================================================ */
+
+function integritaetHtml() {
+  const r = pruefeIntegritaet(state.wissen, state.profil);
+  const zeile = (titel, liste, gut) => `<div class="${liste.length ? 'warn-text' : ''}">${liste.length ? '⚠' : '✓'} ${titel}: ${liste.length ? esc(liste.join(', ')) : gut}</div>`;
+  return `<div class="card small">
+    ${zeile('Referenzierte Rezept-IDs', r.fehlendeRezepte.map(x => `${x.id} (${x.wo})`), 'alle vorhanden')}
+    ${zeile('Verdikt-IDs', r.fehlendeVerdikte.map(x => `${x.id} (${x.wo})`), 'alle vorhanden')}
+    ${zeile('Bestandsschlüssel ohne Eintrag in profil.bestand', r.bestandFehlt, 'keine')}
+    ${zeile('Bestandsschlüssel mit null (= unbekannt)', r.bestandNull, 'keine')}
+    ${zeile('profil.bestand-Schlüssel ohne Material in wissen.json', r.bestandOhneMaterial, 'keine')}
+    ${zeile('Unbekannte Slot-Schlüssel in Builds', r.slotsUnbekannt, 'keine')}
+    ${zeile('Aktiver/Ziel-Build fehlt', r.buildsFehlen, 'nein')}
+  </div>`;
+}
 
 function viewDateien() {
   const w = state.wissen, p = state.profil;
@@ -1397,9 +1459,10 @@ function viewDateien() {
       <button class="btn danger" data-act="wissen-neu">Aus Datei im Repo neu laden</button>
     </div>
 
-    <h2>katalog.json <span class="muted small">Hinweise zu Uniques</span></h2>
-    <div class="kv small"><span class="k">Quelle:</span> ${esc(state.katalogQuelle)} · ${state.katalog.uniques.length} Uniques
-      <br><span class="muted">Wird bei der Screenshot-Erkennung genutzt (num_inherents → implizite Affixe vormarkieren).</span></div>
+    <h2>katalog.json <span class="muted small">Namenskatalog</span></h2>
+    <div class="kv small"><span class="k">Quelle:</span> ${esc(state.katalogQuelle)} · ${katalogZusammenfassung()}
+      <br><span class="muted">Vorschlagslisten und Namensprüfung im Item-Editor (Uniques, Aspekte, Item-Typen, Affixe).
+        Implizite Affixe werden nur vormarkiert, wenn ein Unique num_inherents hat.</span></div>
 
     <h2>profil.json <span class="muted small">persönlich</span></h2>
     <div class="kv small">
@@ -1412,6 +1475,9 @@ function viewDateien() {
       <button class="btn danger" data-act="profil-leer">Profil zurücksetzen (profil-leer.json)</button>
     </div>
 
+    <h2>Integritätsprüfung</h2>
+    ${integritaetHtml()}
+
     <h2>Charakter &amp; Einstellungen</h2>
     <form id="profil-form" class="card" autocomplete="off">
       <div class="grid2">
@@ -1421,6 +1487,44 @@ function viewDateien() {
       <button type="submit" class="btn primary">Speichern</button>
     </form>
     <p class="small muted">Beide Dateien werden als Arbeitskopie im Browser gehalten. Exportierte Dateien kannst du nach <code>data/</code> ins Repo legen.</p>`;
+}
+
+/* ---------- Build-Vorlagen ---------- */
+
+async function zeigeVorlagen() {
+  const box = $('#vorlagen');
+  if (!box) return;
+  box.innerHTML = '<p class="small muted">Lade Vorlagen …</p>';
+  const r = await fetchJson(FILES.vorlagen);
+  const liste = r.ok ? asArray(r.data.vorlagen || r.data) : [];
+  if (!liste.length) {
+    box.innerHTML = `<div class="msg warn">Keine Vorlagen gefunden (${esc(FILES.vorlagen)}${r.ok ? '' : ': ' + esc(r.error)}). Du kannst eine Build-Datei auch direkt laden.</div>`;
+    return;
+  }
+  box.innerHTML = `<div class="card"><b>Build-Vorlagen</b>${liste.map(v => `<div class="check"><span class="ct">
+      <b>${esc(v.name || v.datei)}</b>${v.beschreibung ? `<br><span class="small muted">${esc(v.beschreibung)}</span>` : ''}</span>
+      <button class="btn" data-act="vorlage-import" data-datei="${esc(v.datei)}">Importieren</button></div>`).join('')}</div>`;
+}
+
+/** Nimmt eine Vorlage ({build: {...}}) oder einen einzelnen Build entgegen. */
+function importiereBuild(obj, herkunft) {
+  const roh = obj && obj.build ? obj.build : obj;
+  if (!roh || typeof roh !== 'object' || !roh.slots) { alert('Keine Build-Daten gefunden (erwartet: { "build": { …, "slots": {…} } }).'); return; }
+  const b = normalizeBuild(structuredClone(roh));
+  const p = state.profil;
+  const vorhanden = p.builds.findIndex(x => x.id === b.id);
+  if (vorhanden >= 0) {
+    if (confirm(`Build „${p.builds[vorhanden].name}“ (id ${b.id}) gibt es schon. OK = ersetzen, Abbrechen = als Kopie anlegen.`)) {
+      p.builds[vorhanden] = b;
+    } else {
+      b.id = newId(); b.name += ' (Vorlage)';
+      p.builds.push(b);
+    }
+  } else p.builds.push(b);
+  if (!p.aktiverBuild) p.aktiverBuild = b.id;
+  saveProfil(); buildIndex(); render();
+  state.meldungen.push({ art: 'info', text: `Build „${b.name}“ importiert${herkunft ? ` aus ${herkunft}` : ''}.` });
+  renderHeader();
 }
 
 /* ================================================================
@@ -1476,6 +1580,12 @@ document.addEventListener('click', e => {
     /* Builds */
     case 'new': startEditor({ datum: today() }, true); break;
     case 'open-import': state.importOpen = true; render(); break;
+    case 'vorlagen': zeigeVorlagen(); break;
+    case 'vorlage-import': {
+      const datei = el.dataset.datei;
+      fetchJson(`data/builds/${datei}`).then(r => r.ok ? importiereBuild(r.data, datei) : alert(`Vorlage nicht ladbar: ${r.error}`));
+      break;
+    }
     case 'cancel':
       if (state.editor && state.editor.preview && !confirm('Vorschau verwerfen?')) return;
       state.editor = null; state.importOpen = false; render(); break;
@@ -1576,6 +1686,10 @@ document.addEventListener('change', e => {
       state.wissenQuelle = 'importierte Datei';
       buildIndex(); refreshSchemaMeldung(); render();
     });
+    return;
+  }
+  if (el.id === 'file-build') {
+    readFileJson(el, obj => importiereBuild(obj, 'Datei'));
     return;
   }
   if (el.id === 'file-profil') {

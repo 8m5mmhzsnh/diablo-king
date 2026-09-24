@@ -335,3 +335,8 @@ img.shot { max-width: 100%; border-radius: 6px; display: block; margin-bottom: 1
 .check-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; margin: 6px 0; }
 .check-inline input { width: 20px; height: 20px; accent-color: var(--accent); }
 .bestand-row { display: grid; grid-template-columns: 1fr 110px; gap: 8px; align-items: center; margin: 6px 0; font-size: 14px; }
+
+/* ---------- Bestand / Engpässe ---------- */
+li.aktion.blockiert { opacity: .6; }
+li.aktion.engpass { border-left: 3px solid var(--warn); padding-left: 8px; }
+.bestand-row.engpass label { color: var(--warn); }

@@ -5,7 +5,14 @@
    Die Logik (analysiereSlot, parseTooltip) steht in lib.js.
    ================================================================ */
 
-const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+/* Texterkennung liegt im Repo (vendor/tesseract) – zur Laufzeit wird nichts von einem CDN geladen. */
+const TESS_BASIS = 'vendor/tesseract/';
+const TESS = {
+  script: TESS_BASIS + 'tesseract.min.js',
+  workerPath: TESS_BASIS + 'worker.min.js',
+  corePath: TESS_BASIS + 'core',       // Verzeichnis: der Worker wählt SIMD- oder Standard-Kern selbst
+  langPath: TESS_BASIS + 'lang',       // enthält eng.traineddata.gz
+};
 
 const GRENZEN_HTML = `
   <details class="grenzen">
@@ -46,25 +53,35 @@ function analysenFuerSlot(slotKey) {
 function materialHtml(m) {
   if (!m) return '';
   const eng = istEngpass(state.wissen, m);
-  return `<div class="small">braucht ${m.menge ? esc(m.menge) + ' ' : ''}${esc(bi(m.de, m.en))}${eng ? ' <span class="tag warn">Engpass</span>' : ''}</div>`;
+  const hat = m.bestand == null
+    ? '<span class="warn-text">Bestand unbekannt</span>'
+    : `du hast <b>${esc(m.bestand)}</b>`;
+  return `<div class="small">braucht ${m.menge ? esc(m.menge) + ' ' : ''}${esc(bi(m.de, m.en))}, ${hat}
+    ${eng ? ' <span class="tag warn">Engpass</span>' : ''}
+    ${m.imWissen ? '' : ` <span class="muted">(„${esc(m.schluessel)}“ fehlt in wissen.json)</span>`}
+    <a href="#" data-act="goto-tab" data-tab="bestand">Bestand</a></div>`;
 }
 
-function quellenHtml(a) {
+function aktionQuellenHtml(a) {
   if (!a.quellen) return '';
-  if (!a.quellen.length) return '<div class="small muted">Quelle: – (in wissen.json unter uniqueQuellen oder farmziele ergänzen)</div>';
+  if (!a.quellen.length) return '<div class="small muted">Quelle: – (in wissen.json unter eintraege[].quelle oder farmziele ergänzen)</div>';
   return `<div class="small">Quelle: ${a.quellen.map(q => q.farm
-    ? `<a href="#" data-act="goto-tab" data-tab="farmziele">${esc(q.text)}</a>` : esc(q.text)).join(' · ')}</div>`;
+    ? `<a href="#" data-act="goto-tab" data-tab="farmziele">${esc(q.text)}</a>
+       ${q.farm.kosten ? `<span class="muted"> – Kosten: ${esc(q.farm.kosten)}</span>` : ''}
+       ${q.farm.belohnungen ? `<br><span class="muted">Belohnungen: ${esc(q.farm.belohnungen)}</span>` : ''}`
+    : esc(q.text)).join('<br>')}</div>`;
 }
 
 function aktionHtml(a, extra = '') {
   const rez = a.rezept
     ? `<div class="small">${a.rezept.fehlt ? 'Rezept „reroll-affixwerte“ fehlt in wissen.json → rezepte.' : `<a href="#" data-act="goto-tab" data-tab="rezepte">Rezept ansehen: ${esc(bi(a.rezept.name_de || a.rezept.id, a.rezept.name_en))}</a>`}</div>` : '';
-  return `<li class="aktion">
-    <span class="prio ${a.prio}">${esc(a.prio)}</span>${extra}
+  const eng = a.material && istEngpass(state.wissen, a.material);
+  return `<li class="aktion${a.blockiert ? ' blockiert' : ''}${eng ? ' engpass' : ''}">
+    <span class="prio ${a.prio}">${esc(a.prio)}</span>${a.blockiert ? '<span class="tag warn">blockiert – Bestand reicht nicht</span> ' : ''}${extra}
     <b>${esc(a.text)}</b>
     ${a.grund ? `<div class="small muted">${esc(a.grund)}</div>` : ''}
     ${a.kandidaten && a.kandidaten.length > 1 ? `<div class="small muted">Umrollbare Zeilen, schlechteste zuerst: ${esc(a.kandidaten.join(' · '))}</div>` : ''}
-    ${materialHtml(a.material)}${quellenHtml(a)}${rez}
+    ${materialHtml(a.material)}${aktionQuellenHtml(a)}${rez}
     ${a.warnung ? `<div class="hinweis warn">⚠ ${esc(a.warnung)}</div>` : ''}
     ${a.zusatz ? `<div class="small muted">${esc(a.zusatz)}</div>` : ''}
   </li>`;
@@ -150,27 +167,36 @@ function viewInventar() {
     <div class="kv small">Qualstufe: <b>${esc(c.qualstufe || '–')}</b> · Paragon: <b>${esc(c.paragon || '–')}</b>
       <a href="#" data-act="open-dateien">ändern</a></div>
     <div class="inv-grid">${cards}</div>
-    ${viewBestand()}`;
+    <p class="small"><a href="#" data-act="goto-tab" data-tab="bestand">Material-Bestand bearbeiten →</a></p>`;
 }
+
+/* ---------------- Ansicht: Bestand ---------------- */
 
 function viewBestand() {
   const b = state.profil.bestand;
-  const bekannt = Object.values(MATERIAL).map(m => m.de);
-  const namen = [...new Set([...bekannt, ...Object.keys(b)])];
-  return `<h2>Material-Bestand</h2>
-    <p class="small muted">Leer = unbekannt. Wird z. B. für die Warnung „Kein Reset möglich“ beim Härten genutzt.</p>
+  const mats = materialEintraege(state.wissen);
+  const schluessel = mats.map(e => e.bestandsschluessel);
+  const extra = Object.keys(b).filter(k => !schluessel.includes(k));
+  const zeile = (key, label, e) => {
+    const v = b[key];
+    return `<div class="bestand-row${e && e.engpass ? ' engpass' : ''}">
+      <label for="best-${esc(key)}">${label}${e && e.engpass ? ' <span class="tag warn">Engpass</span>' : ''}
+        <br><span class="small muted">${esc(key)}</span></label>
+      <input id="best-${esc(key)}" type="text" inputmode="numeric" name="b.${esc(key)}" value="${v == null ? '' : esc(v)}" placeholder="unbekannt">
+    </div>`;
+  };
+  return `
+    <h2>Material-Bestand</h2>
+    <p class="small muted">Mengen aus deinem Spiel. Leer = <b>unbekannt</b> – dann erscheinen Warnungen.
+      Bei 0 werden Aktionen, die das Material brauchen, als blockiert markiert. Gespeichert in profil.json → bestand.
+      Die Namen kommen aus wissen.json (Einträge mit bestandsschluessel).</p>
     <form id="bestand-form" class="card" autocomplete="off">
-      ${namen.map((n, i) => `<div class="bestand-row">
-        <label for="best-${i}">${esc(n)}${MATERIAL_EN(n) ? ` <span class="muted small">(${esc(MATERIAL_EN(n))})</span>` : ''}</label>
-        <input id="best-${i}" type="text" inputmode="numeric" name="b.${esc(n)}" value="${esc(b[n] ?? '')}">
-      </div>`).join('')}
-      <div class="bestand-row"><input type="text" name="neu-name" placeholder="weiteres Material"><input type="text" inputmode="numeric" name="neu-wert" placeholder="Anzahl"></div>
+      ${mats.map(e => zeile(e.bestandsschluessel, esc(bi(e.name_de || e.name, e.name_en)), e)).join('') || '<p class="small muted">In wissen.json sind keine Materialien mit bestandsschluessel hinterlegt.</p>'}
+      ${extra.length ? `<h3>Weitere Schlüssel im Profil</h3><p class="small muted">Stehen in profil.bestand, aber ohne Material in wissen.json.</p>
+        ${extra.map(k => zeile(k, esc(k), null)).join('')}` : ''}
+      <div class="bestand-row"><input type="text" name="neu-name" placeholder="weiterer Schlüssel"><input type="text" inputmode="numeric" name="neu-wert" placeholder="Anzahl"></div>
       <button class="btn primary" type="submit">Speichern</button>
     </form>`;
-}
-function MATERIAL_EN(de) {
-  const m = Object.values(MATERIAL).find(x => x.de === de);
-  return m ? m.en : '';
 }
 
 /* ---------------- Ansicht: Item-Editor ---------------- */
@@ -219,12 +245,12 @@ function viewInvEditor() {
       ${vs && vs.key ? `<p class="small muted">Vorschlag: <b>${esc(SLOT_BY_KEY[vs.key].de)}</b> (${esc(vs.warum)})${ed.slotHint && ed.slotHint !== vs.key ? ` – eingefügt hast du bei <b>${esc(SLOT_BY_KEY[ed.slotHint].de)}</b>.` : ''}</p>` : ''}
       ${bestehend && ed.neu ? `<p class="small warn-text">Im gewählten Slot liegt schon „${esc(bestehend.name)}“ – Übernehmen ersetzt es.</p>` : ''}
       <div class="grid2">
-        <label class="f">Name<input type="text" name="name" value="${esc(d.name)}"></label>
+        <label class="f">Name<input type="text" name="name" list="dl-kat-uniques" value="${esc(d.name)}"></label>
         <label class="f">Slug (für katalog.json)<input type="text" name="slug" value="${esc(d.slug)}"></label>
         <label class="f">Seltenheit<select name="seltenheit"><option value="">–</option>${seltOpt}</select></label>
-        <label class="f">Item-Typ<input type="text" name="itemTyp" value="${esc(d.itemTyp)}"></label>
+        <label class="f">Item-Typ<input type="text" name="itemTyp" list="dl-kat-itemTypen" value="${esc(d.itemTyp)}"></label>
         <label class="f">Gegenstandsmacht<input type="text" inputmode="numeric" name="gegenstandsmacht" value="${esc(d.gegenstandsmacht)}"></label>
-        <label class="f">Geprägter Aspekt<input type="text" name="aspekt" list="dl-names" value="${esc(d.aspekt)}"></label>
+        <label class="f">Geprägter Aspekt<input type="text" name="aspekt" list="dl-kat-aspekte" value="${esc(d.aspekt)}"></label>
       </div>
       <label class="check-inline"><input type="checkbox" name="vermacht" ${d.vermacht ? 'checked' : ''}> vermacht (Ancestral)</label>
 
@@ -235,7 +261,7 @@ function viewInvEditor() {
           <div class="affix-main">
             ${konfHtml(a.konfidenz)}
             <input type="text" name="a.${i}.wert" value="${esc(a.wert)}" placeholder="Wert" class="wert">
-            <input type="text" name="a.${i}.text" value="${esc(a.text)}" placeholder="Affix">
+            <input type="text" name="a.${i}.text" value="${esc(a.text)}" placeholder="Affix" list="dl-kat-affixe">
             <button type="button" class="icon-btn" data-act="inv-del-affix" data-i="${i}" aria-label="Zeile löschen">×</button>
           </div>
           <div class="affix-flags">
@@ -244,6 +270,7 @@ function viewInvEditor() {
             <label><input type="checkbox" name="a.${i}.verzaubert" ${a.verzaubert ? 'checked' : ''}> verzaubert</label>
             <label><input type="checkbox" name="a.${i}.schwach" ${a.schwach ? 'checked' : ''}> Wert schwach</label>
             ${a.lang ? '<span class="small warn-text">lange Zeile – vermutlich Effekttext, kein Affix?</span>' : ''}
+            ${affixKatalogHinweis(a.text, i)}
           </div>
         </div>`).join('') || '<p class="small muted">Keine Affixe.</p>'}
       </div>
@@ -270,12 +297,49 @@ function viewInvEditor() {
           <option value="manuell" ${d.quelle !== 'ocr' ? 'selected' : ''}>manuell</option></select></label>
       </div>
       ${ed.roh ? `<details class="slot"><summary>Roh-Text der Erkennung (nur zum Vergleich)</summary><pre class="json">${esc(ed.roh)}</pre></details>` : ''}
-      ${namenDatalist()}
+      ${katalogDatalists()}
       <div class="btn-row" style="margin-top:14px">
         <button type="submit" class="btn primary" ${ed.laeuft ? 'disabled' : ''}>Übernehmen</button>
         <button type="button" class="btn" data-act="inv-cancel">Verwerfen</button>
       </div>
     </form>`;
+}
+
+/* ---------- Katalog: Vorschlagslisten und Prüfung ---------- */
+
+let KAT_CACHE = null;
+function katalogNamen(kategorie) {
+  if (!KAT_CACHE || KAT_CACHE.quelle !== state.katalog) KAT_CACHE = { quelle: state.katalog };
+  if (!KAT_CACHE[kategorie]) {
+    const namen = katalogListe(state.katalog, kategorie).map(x => x.name_en || x.name_de || x.name || x.slug).filter(Boolean);
+    KAT_CACHE[kategorie] = { namen, set: new Set(namen.map(norm)) };
+  }
+  return KAT_CACHE[kategorie];
+}
+function katalogDatalists() {
+  // Einträge aus wissen.json zuerst (korrigierte Namen), dann der Katalog
+  const wissenNamen = typ => state.wissen.eintraege.filter(e => norm(e.typ) === typ).flatMap(e => [e.name_en, e.name_de]).filter(Boolean);
+  const dl = (id, list) => `<datalist id="${id}">${[...new Set(list)].map(n => `<option value="${esc(n)}">`).join('')}</datalist>`;
+  return dl('dl-kat-uniques', [...wissenNamen('unique'), ...katalogNamen('uniques').namen]) +
+    dl('dl-kat-aspekte', [...wissenNamen('aspekt'), ...katalogNamen('aspekte').namen]) +
+    dl('dl-kat-itemTypen', katalogNamen('itemTypen').namen) +
+    dl('dl-kat-affixe', katalogNamen('affixe').namen);
+}
+/** Affix nicht im Katalog? Ähnlichsten Namen vorschlagen – nur als Hinweis. */
+function affixKatalogHinweis(text, i) {
+  const k = katalogNamen('affixe');
+  if (!text || !k.namen.length || k.set.has(norm(text))) return '';
+  const t = new Set(tokens(text));
+  let best = null, bestScore = 0;
+  for (const n of k.namen) {
+    const nt = tokens(n);
+    const treffer = nt.filter(x => t.has(x)).length;
+    const score = treffer / Math.max(nt.length, t.size);
+    if (score > bestScore) { bestScore = score; best = n; }
+  }
+  return best && bestScore >= 0.5
+    ? `<span class="small">nicht im Katalog – meintest du <a href="#" data-act="inv-affix-vorschlag" data-i="${i}" data-wert="${esc(best)}">${esc(best)}</a>?</span>`
+    : '<span class="small muted">nicht im Katalog</span>';
 }
 
 /** Liest das Formular in den Entwurf zurück (vor jeder Strukturänderung und beim Übernehmen). */
@@ -334,9 +398,9 @@ function ladeTesseract() {
   if (!tessLaden) {
     tessLaden = new Promise((res, rej) => {
       const s = document.createElement('script');
-      s.src = TESSERACT_URL;
+      s.src = TESS.script;
       s.onload = res;
-      s.onerror = () => { tessLaden = null; rej(new Error('Texterkennung konnte nicht geladen werden (offline?)')); };
+      s.onerror = () => { tessLaden = null; rej(new Error(`Texterkennung nicht gefunden (${TESS.script})`)); };
       document.head.appendChild(s);
     });
   }
@@ -354,6 +418,11 @@ async function holeWorker() {
   await ladeTesseract();
   const sprache = state.profil.einstellungen.ocrSprache || 'eng';
   tessWorker = await window.Tesseract.createWorker(sprache, 1, {
+    workerPath: TESS.workerPath,
+    corePath: TESS.corePath,
+    langPath: TESS.langPath,
+    workerBlobURL: false,
+    gzip: true,
     logger: m => {
       if (!m || !m.status) return;
       const pct = m.progress != null ? ` ${Math.round(m.progress * 100)} %` : '';
@@ -447,7 +516,7 @@ function viewNaechster() {
     }
   });
   const alle = [...eintraege.values()].sort((x, y) =>
-    PRIO_RANG[x.a.prio] - PRIO_RANG[y.a.prio] || x.si - y.si);
+    Number(!!x.a.blockiert) - Number(!!y.a.blockiert) || PRIO_RANG[x.a.prio] - PRIO_RANG[y.a.prio] || x.si - y.si);
   const gruppe = g => alle.filter(x => x.a.gruppe === g);
   const liste = xs => xs.length ? `<ul class="aktionen">${xs.map(({ a, s, rolle }) => aktionHtml(a,
     ` <span class="tag">${esc(s.de)}</span>${rolle === 'aktiv' ? '<span class="badge aktiv">aktiv</span>' : rolle === 'ziel' ? '<span class="badge ziel">Ziel</span>' : rolle === 'beide' ? '<span class="badge both">beide</span>' : ''} `)).join('')}</ul>`
@@ -470,7 +539,8 @@ function viewNaechster() {
 
     <h3>Engpässe</h3>
     <p class="small">${eng.liste.length ? esc(eng.liste.join(' · ')) : '<span class="muted">Keine hinterlegt.</span>'}
-      <span class="muted">${eng.abgeleitet ? '– abgeleitet aus Einträgen mit typ „material“ (wissen.engpaesse fehlt)' : '– aus wissen.engpaesse'}</span></p>
+      <span class="muted">${{ engpaesse: '– aus wissen.engpaesse', engpass: '– Materialien mit engpass: true', material: '– abgeleitet aus Einträgen mit typ „material“' }[eng.herkunft]}</span>
+      <a href="#" data-act="goto-tab" data-tab="bestand">Bestand bearbeiten</a></p>
 
     <h2>Wechselkriterien Ziel-Build${zb ? `: ${esc(zb.name)}` : ''}</h2>
     ${!zb ? '<p class="small muted">Kein Ziel-Build gesetzt.</p>' : zb.wechselkriterien.length
@@ -517,6 +587,9 @@ document.addEventListener('click', e => {
       render(); break;
     case 'inv-del-affix':
       leseInvForm(); state.invEditor.draft.affixe.splice(+el.dataset.i, 1); render(); break;
+    case 'inv-affix-vorschlag':
+      e.preventDefault();
+      leseInvForm(); state.invEditor.draft.affixe[+el.dataset.i].text = el.dataset.wert; render(); break;
     case 'inv-add-sockel':
       leseInvForm(); state.invEditor.draft.sockel.push({ gefuellt: false, inhalt: '' }); render(); break;
     case 'inv-del-sockel':
@@ -543,7 +616,7 @@ document.addEventListener('submit', e => {
     for (const [k, v] of fd.entries()) {
       if (!k.startsWith('b.')) continue;
       const t = String(v).trim();
-      if (t !== '') b[k.slice(2)] = Number(t) || 0;
+      b[k.slice(2)] = t === '' ? null : (Number(t) || 0);   // leer = unbekannt
     }
     const nn = String(fd.get('neu-name') || '').trim(), nw = String(fd.get('neu-wert') || '').trim();
     if (nn) b[nn] = Number(nw) || 0;
