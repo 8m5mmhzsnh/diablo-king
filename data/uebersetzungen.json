@@ -1,5 +1,5 @@
 {
-  "_info": "Deutsch → englische Affixnamen für den Vergleich von Build-Vorgaben (deutsch) mit Tooltips (englisch). Rechts steht der Name wie in katalog.json. Fehlt ein Begriff, meldet die App ihn als „nicht vergleichbar“ und schlägt dafür nichts vor. „Primärattribut“ ist eingebaut: passt auf Strength, Dexterity, Intelligence oder Willpower (oder auf charakter.primaerattribut, falls gesetzt).",
+  "_info": "Deutsch → englische Affixnamen für den Vergleich von Build-Vorgaben (deutsch) mit Tooltips (englisch). Rechts steht der Name wie in katalog.json. Fehlt ein Begriff, meldet die App ihn als „nicht vergleichbar“ und schlägt dafür nichts vor. „Primärattribut“ ist eingebaut: passt auf Strength, Dexterity, Intelligence oder Willpower (oder auf charakter.primaerattribut, falls gesetzt). „itemTypen“: englischer Tooltip-Typ → deutsche Bezeichnung, wie sie die Regeln in wissen.json verwenden.",
   "schemaVersion": 2,
   "affixe": {
     "Willenskraft": "Willpower",
@@ -27,5 +27,27 @@
     "Ränge zu Sengender Schrei": "To Blazing Scream",
     "Ränge zu Dämonologie-Fertigkeiten": "To Demonology Skills",
     "Ränge zu allen Fertigkeiten": "To All Skills"
+  },
+  "itemTypen": {
+    "Helm": "Helm",
+    "Chest Armor": "Brustschutz",
+    "Gloves": "Handschuhe",
+    "Pants": "Hose",
+    "Boots": "Stiefel",
+    "Amulet": "Amulett",
+    "Ring": "Ring",
+    "Sword": "Schwert",
+    "Axe": "Axt",
+    "Mace": "Streitkolben",
+    "Dagger": "Dolch",
+    "Wand": "Zauberstab",
+    "Staff": "Stab",
+    "Bow": "Bogen",
+    "Crossbow": "Armbrust",
+    "Polearm": "Stangenwaffe",
+    "Scythe": "Sense",
+    "Focus": "Fokus",
+    "Shield": "Schild",
+    "Totem": "Totem"
   }
 }
