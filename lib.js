@@ -594,15 +594,92 @@ function slotVorschlag({ itemTyp, name, katalog, inventar, wissen }) {
   return { key, warum };
 }
 
-const RE_STOP = /(requires level|benötigt stufe|sell value|verkaufswert|durability|haltbarkeit|account bound|accountgebunden|right mouse|rechtsklick|unique equipped|only one|kann nur|properties lost|eigenschaften gehen)/i;
-const RE_BASIS = /^[\d.,]+\s+(armou?r|rüstung|damage per second|schaden pro sekunde)\b|damage per hit|schaden pro treffer|attacks? per second|angriffe pro sekunde|^\s*\[\s*[\d.,]+\s*-\s*[\d.,]+\s*\]\s*damage/i;
+/* Fußzeilen: werden übersprungen, beenden aber das Lesen nicht (danach kommen z. B. noch „Tempers: 3/3“). */
+const RE_FUSS = /(requires level|benötigt stufe|sell value|verkaufswert|durability|haltbarkeit|account bound|accountgebunden|right mouse|rechtsklick|unique equipped|only one|kann nur|properties lost|eigenschaften gehen|lord of hatred|vessel of hatred|item$|season|saison)/i;
+const RE_KOPF = /^(equipped|ausgerüstet|angelegt|currently equipped)$/i;
+const RE_BASIS = /^[\d.,]+\s+(armou?r|rüstung|damage per second|schaden pro sekunde|block chance)\b|damage per hit|schaden pro treffer|attacks? per second|angriffe pro sekunde|^\s*\[\s*[\d.,]+\s*-\s*[\d.,]+\s*\]\s*damage/i;
 const RE_POWER = /(\d{2,4})\s*(item power|gegenstandsmacht)|(item power|gegenstandsmacht)\D{0,4}(\d{2,4})/i;
 const RE_HAERT = /(temper\w*|härtung\w*|gehärtet)\D{0,12}(\d+)\s*\/\s*(\d+)/i;
 const RE_VOLL = /(masterwork\w*|vollend\w*)\D{0,12}(\d+)\s*\/\s*(\d+)/i;
 const RE_LEER = /(empty socket|leerer sockel|freier sockel)/i;
 const RE_GEM = /\b(ruby|sapphire|emerald|topaz|amethyst|diamond|skull|rubin|saphir|smaragd|topas|amethyst|diamant|schädel)\b/i;
 const RE_ANCESTRAL = /\b(ancestral|vermacht|vermächtnis\w*)\b/i;
-const RE_BULLET_OCR = /^[\s•*·o»«◆◇♦>~\-–=]+(?=[+\-\d\[a-zA-Z])/;
+/* Beginn eines Effekt-Absatzes (Aspekt oder Unique-Kraft) – gehört nicht zu den Affixen. */
+const RE_EFFEKT = /^(imprinted|geprägt|aufgeprägt|unique power|einzigartige kraft)\s*:/i;
+/* Aufzählungszeichen, die Tesseract aus ◆ / ★ macht: o ¢ © e * • … – nur vor einem Wert. */
+const RE_OCR_BULLET = /^([^\p{L}\p{N}+\-\[]{1,3}|[oOeEcCaQ0])\s+(?=[+\-]?\d)/u;
+/* Stern als Aufzählungszeichen = vermutlich großer Affix. */
+const RE_STERN = /^[*★✦✧☆]\s*/;
+
+/** Levenshtein-Distanz (für Katalog-Abgleich von OCR-Text). */
+function distanz(a, b) {
+  if (a === b) return 0;
+  const m = a.length, n = b.length;
+  if (!m || !n) return m || n;
+  let prev = Array.from({ length: n + 1 }, (_, k) => k);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let k = 1; k <= n; k++) cur[k] = Math.min(prev[k] + 1, cur[k - 1] + 1, prev[k - 1] + (a[i - 1] === b[k - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+
+/**
+ * Sucht den passenden Namen in einer Liste: exakt (normalisiert) oder mit kleinem Tippfehler.
+ * @returns {{name: string, exakt: boolean}|null}
+ */
+/** Typische OCR-Verwechslungen angleichen: rn↔m, vv↔w, cl↔d, 0↔o, 1/l↔i. */
+const ocrForm = s => norm(s).replace(/rn/g, 'm').replace(/vv/g, 'w').replace(/cl/g, 'd').replace(/0/g, 'o').replace(/[1l]/g, 'i');
+
+function namenAbgleich(text, namen, maxAnteil = 0.2) {
+  const n = ocrForm(text);
+  if (!n) return null;
+  let best = null, bestD = Infinity;
+  for (const x of namen) {
+    const k = ocrForm(x);
+    if (!k) continue;
+    if (k === n) return { name: x, exakt: norm(x) === norm(text) };
+    if (Math.abs(k.length - n.length) > Math.max(2, n.length * maxAnteil)) continue;
+    const d = distanz(n, k);
+    if (d < bestD) { bestD = d; best = x; }
+  }
+  return best && bestD <= Math.max(1, Math.floor(n.length * maxAnteil)) ? { name: best, exakt: false } : null;
+}
+
+/** Bereinigt eine OCR-Zeile: Glyphen, Bereichsangaben [x - y], [+] und Streuzeichen raus. */
+function ocrZeile(t) {
+  return String(t || '')
+    .replace(/\+?\s*\[[^\]]*\]\s*%?/g, ' ')           // +[83 - 99], [1,016 - 1,225], [30 - 50]%
+    .replace(/[\[\]{}|\\¦]/g, ' ')                      // übrig gebliebene Klammern/Striche
+    .replace(/[©®™¢¥£€§¤°º¹²³@#^~`´¨«»<>]/g, ' ')       // typische Fehlglyphen (Icons, Gold-Symbol)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Aspekt aus dem Namen eines legendären Items: „Sadistic Doom Casque“ → Sadistic, „… of Ignition“ → Aspect of Ignition. */
+function aspektAusName(name, { wissen, katalog } = {}) {
+  const nt = tokens(name);
+  if (!nt.length) return null;
+  const katalogAspekte = katalogListe(katalog, 'aspekte').map(a => a.name_en).filter(Boolean);
+  const wissenAspekte = asArray(wissen && wissen.eintraege).filter(e => norm(e.typ) === 'aspekt');
+  const kandidaten = [...new Set([...katalogAspekte, ...wissenAspekte.map(e => String(e.name_en || '').replace(/\s*aspect\s*|\s*aspekt\s*/ig, ' ').replace(/^of /i, '').trim())])]
+    .filter(Boolean).map(a => ({ a, t: tokens(a) })).sort((x, y) => y.t.length - x.t.length);
+  const tokEq = (x, y) => x === y || (y.length >= 5 && x.length > y.length && x.length - y.length <= 2 && x.endsWith(y)) || (y.length >= 6 && distanz(x, y) <= 1);
+  for (const { a, t } of kandidaten) {
+    // Präfix-Form: die ersten Wörter des Namens
+    if (t.length <= nt.length && t.every((x, k) => tokEq(nt[k], x))) return aspektAnzeige(a, wissenAspekte);
+    // „… of X“-Form
+    const of = nt.indexOf('of');
+    if (of >= 0 && t.length === nt.length - of - 1 && t.every((x, k) => tokEq(nt[of + 1 + k], x))) return aspektAnzeige(a, wissenAspekte);
+  }
+  return null;
+}
+function aspektAnzeige(kern, wissenAspekte) {
+  const k = norm(kern);
+  const e = wissenAspekte.find(x => hasWords(norm(x.name_en), k));
+  return e ? bi(e.name_de, e.name_en) : `${kern} Aspect`;
+}
 
 /**
  * Macht aus OCR-Zeilen einen Entwurf. Das Ergebnis ist NIE direkt Inventar –
@@ -610,13 +687,21 @@ const RE_BULLET_OCR = /^[\s•*·o»«◆◇♦>~\-–=]+(?=[+\-\d\[a-zA-Z])/;
  * @param {{text: string, confidence?: number}[]} lines
  */
 function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
-  const clean = asArray(lines)
+  const roh = asArray(lines)
     .map(l => (typeof l === 'string' ? { text: l, confidence: null } : l))
-    .map(l => ({ text: String(l.text || '').replace(/\s+/g, ' ').trim(), confidence: l.confidence == null ? null : Math.round(l.confidence) }))
-    .filter(l => l.text.length > 1);
+    .map(l => ({ roh: String(l.text || '').replace(/\s+/g, ' ').trim(), confidence: l.confidence == null ? null : Math.round(l.confidence) }));
+  // Zeilen ohne echten Text (Rahmen, Icons, Bildreste) verwerfen
+  const clean = roh.map(l => ({ ...l, text: ocrZeile(l.roh) }))
+    .filter(l => {
+      const buchst = (l.text.match(/[\p{L}\p{N}]/gu) || []).length;
+      if (buchst < 2) return false;
+      if (l.confidence != null && l.confidence < 45 && buchst / l.text.length < 0.7) return false;
+      return !RE_KOPF.test(l.text);
+    });
   const item = leeresItem();
   item.quelle = 'ocr';
   const affixe = [];
+  const hinweise = [];
   const selt = asArray(wissen && wissen.seltenheitSynonyme);
   const seltenheitIn = text => {
     for (const t of tokens(text)) {
@@ -636,19 +721,38 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
     item.vermacht = RE_ANCESTRAL.test(tl);
     const rarityWords = new Set(selt.flatMap(x => [x.id, ...asArray(x.synonyme)]).map(norm));
     item.itemTyp = tl.split(/\s+/).filter(w => !rarityWords.has(norm(w)) && !RE_ANCESTRAL.test(w) && !/^(sacred|heilig\w*)$/i.test(w)).join(' ').trim();
+    // Name: bis zu zwei Zeilen direkt über der Typzeile
     item.name = clean.slice(Math.max(0, typIdx - 2), typIdx).map(l => l.text).join(' ').trim();
   }
   if (!item.name && clean.length) item.name = clean[0].text;
-  item.name = item.name.replace(/[^\p{L}\p{N}' \-]/gu, '').trim();
+  item.name = item.name.replace(/[^\p{L}\p{N}' \-]/gu, '').replace(/\s+/g, ' ').trim();
+
+  // Unique-Namen mit Katalog und Wissen abgleichen (OCR-Tippfehler korrigieren)
+  const unique = istUnique(wissen, item.seltenheit);
+  if (unique && item.name) {
+    const namen = [
+      ...asArray(wissen && wissen.eintraege).filter(e => ['unique', 'mythisch', 'mythic'].includes(norm(e.typ))).flatMap(e => [e.name_en, e.name_de]),
+      ...katalogListe(katalog, 'uniques').map(u => u.name_en),
+    ].filter(Boolean);
+    const hit = namenAbgleich(item.name, namen, 0.25);
+    if (hit && !hit.exakt) hinweise.push(`Name „${item.name}“ zu „${hit.name}“ korrigiert (Katalog) – bitte prüfen.`);
+    if (hit) item.name = hit.name;
+  } else if (item.name) {
+    // Legendäre Items: Namen in Groß/Klein normalisieren, Aspekt aus dem Namen ableiten
+    item.name = item.name.toLowerCase().replace(/(^|\s)\p{L}/gu, m => m.toUpperCase());
+    const asp = aspektAusName(item.name, { wissen, katalog });
+    if (asp) { item.aspekt = asp; hinweise.push(`Aspekt „${asp}“ aus dem Item-Namen abgeleitet – bitte prüfen.`); }
+  }
   item.slug = slugify(item.name);
 
-  let inAffixen = false;
+  const katalogAffixe = katalogListe(katalog, 'affixe').map(a => a.name_en).filter(Boolean);
+  let modus = 'kopf';        // kopf → affixe → effekt → fuss
   let letztes = null;
   for (let i = typIdx >= 0 ? typIdx + 1 : 1; i < clean.length; i++) {
     const l = clean[i];
     const t = l.text;
     const p = t.match(RE_POWER);
-    if (p) { item.gegenstandsmacht = Number(p[1] || p[4]); inAffixen = true; letztes = null; continue; }
+    if (p) { item.gegenstandsmacht = Number(p[1] || p[4]); modus = 'affixe'; letztes = null; continue; }
     if (RE_ANCESTRAL.test(t) && t.length < 30) { item.vermacht = true; continue; }
     const hm = t.match(RE_HAERT);
     if (hm) { item.haertungen.genutzt = Number(hm[2]); item.haertungen.max = Number(hm[3]); letztes = null; continue; }
@@ -656,33 +760,52 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
     if (vm) { item.vollendung.stufe = Number(vm[2]); item.vollendung.max = Number(vm[3]); letztes = null; continue; }
     if (RE_LEER.test(t)) { item.sockel.push({ gefuellt: false, inhalt: '' }); letztes = null; continue; }
     const gem = t.match(RE_GEM);
-    if (gem && t.length < 40 && !/%/.test(t)) { item.sockel.push({ gefuellt: true, inhalt: t.replace(RE_BULLET_OCR, '') }); letztes = null; continue; }
-    if (RE_STOP.test(t)) break;
-    if (RE_BASIS.test(t)) { inAffixen = true; letztes = null; continue; }
+    if (gem && t.length < 40 && !/%/.test(t)) { item.sockel.push({ gefuellt: true, inhalt: t.replace(RE_OCR_BULLET, '') }); letztes = null; continue; }
+    if (RE_FUSS.test(t)) { modus = 'fuss'; letztes = null; continue; }
+    if (modus === 'fuss') continue;
+    if (RE_BASIS.test(t)) { modus = 'affixe'; letztes = null; continue; }
 
-    const ohne = t.replace(RE_BULLET_OCR, '').replace(/\[[^\]]*\]/g, '').trim();
-    const hatZahl = /\d/.test(ohne);
-    // Fortsetzung einer umgebrochenen Affixzeile
-    if (letztes && !hatZahl && ohne.length < 35 && /^[a-zäöü(]/.test(ohne)) {
-      letztes.text = `${letztes.text} ${ohne}`.trim();
+    const stern = RE_STERN.test(l.roh);
+    const ohneBullet = t.replace(RE_OCR_BULLET, '').replace(RE_STERN, '');
+    if (RE_EFFEKT.test(ohneBullet)) { modus = 'effekt'; letztes = null; continue; }
+    const istAffix = /^[+\-]?\s*\d/.test(ohneBullet) || /^(lucky hit|glückstreffer)\s*:/i.test(ohneBullet);
+    if (modus === 'effekt' && !istAffix) continue;
+    // Fortsetzung einer umgebrochenen Affixzeile: kurz, ohne Zahl, ohne Satzende
+    if (letztes && !istAffix && ohneBullet.split(' ').length <= 3 && !/\d|[.!?]$/.test(ohneBullet)) {
+      letztes.text = `${letztes.text} ${ohneBullet}`.trim();
       continue;
     }
-    if (!inAffixen && !hatZahl) continue;
-    inAffixen = true;
-    const m = ohne.match(/^([+\-]?\s*[\d.,]+\s*%?)\s+(.+)$/);
+    if (!istAffix) {
+      // Langer Satz ohne Wert nach den Affixen = Effekttext (z. B. Unique-Kraft)
+      if (modus === 'affixe' && ohneBullet.length > 30) modus = 'effekt';
+      continue;
+    }
+    modus = 'affixe';
+    const m = ohneBullet.match(/^([+\-]?\s*[\d.,]+\s*%?)\s+(.+)$/);
     const a = {
-      text: m ? m[2] : ohne, wert: m ? m[1].replace(/\s+/g, '') : '',
-      gross: false, implizit: false, verzaubert: false, schwach: false,
-      konfidenz: l.confidence, lang: ohne.length > 70,
+      text: (m ? m[2] : ohneBullet).replace(/[+\-%\s]+$/, '').trim(),
+      wert: m ? m[1].replace(/\s+/g, '') : '',
+      gross: stern, implizit: false, verzaubert: false, schwach: false,
+      konfidenz: l.confidence, lang: ohneBullet.length > 70, roh: l.roh,
     };
     affixe.push(a);
     letztes = a;
   }
 
+  // Affixnamen mit dem Katalog abgleichen
+  for (const a of affixe) {
+    const hit = namenAbgleich(a.text, katalogAffixe, 0.15);
+    if (hit) {
+      if (!hit.exakt) a.korrigiertAus = a.text;
+      a.text = hit.name;
+    }
+  }
+  if (affixe.some(a => a.gross)) hinweise.push('Stern-Symbol erkannt: diese Zeilen sind als „groß“ vorgemerkt – bitte prüfen.');
+
   // Implizite Affixe bei Uniques vormarkieren (Hinweis aus katalog.json, keine Garantie)
   const u = findeUnique(katalog, item.name, item.slug);
   let implizitHinweis = '';
-  if (istUnique(wissen, item.seltenheit)) {
+  if (unique) {
     const n = u ? zahl(u.num_inherents, null) : null;
     if (n != null) {
       affixe.slice(0, n).forEach(a => { a.implizit = true; });
@@ -701,7 +824,8 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
     slot: slotVorschlag({ itemTyp: item.itemTyp, name: item.name, katalog, inventar, wissen }),
     unique: u,
     implizitHinweis,
-    roh: clean.map(l => l.text).join('\n'),
+    hinweise,
+    roh: roh.map(l => l.roh).filter(Boolean).join('\n'),
   };
 }
 
@@ -712,6 +836,6 @@ if (typeof module !== 'undefined' && module.exports) {
     katalogListe, eintragZu, AKTION_MATERIAL, material, materialEintraege, farbeCss, pruefeIntegritaet,
     leeresItem, normalizeItem, normalizeInventar, bestandVon, engpassListe, istEngpass,
     reihenfolgeNotiz, STANDARD_REIHENFOLGE, KATEGORIE_LABEL, analysiereSlot, PRIO_RANG, TEXT,
-    slotVorschlag, parseTooltip,
+    slotVorschlag, parseTooltip, ocrZeile, aspektAusName, namenAbgleich, distanz,
   };
 }

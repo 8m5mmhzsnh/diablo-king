@@ -8,9 +8,10 @@ Reines HTML/CSS/JS, kein Build-Schritt, keine Ladung von CDNs zur Laufzeit. Auch
 
 | Weg | Wie |
 |---|---|
-| Lokaler Webserver (empfohlen) | Im Ordner `python3 -m http.server 8000` ausführen und `http://localhost:8000` öffnen |
-| Aufs Handy | Gleicher Befehl auf dem PC, dann am Handy `http://<IP-des-PCs>:8000` (gleiches WLAN). Oder das Repo über GitHub Pages veröffentlichen. |
-| Doppelklick auf `index.html` | Der Browser blockiert dann das Lesen der JSON-Dateien. Unter **⚙ Dateien** einmal `wissen.json` und `profil.json` von Hand importieren. |
+| Online (am einfachsten) | https://8m5mmhzsnh.github.io/diablo-king/ |
+| Windows, lokal | **`start.bat`** im App-Ordner doppelklicken. Das startet einen kleinen Webserver (PowerShell, nur `localhost`, kein Python nötig) und öffnet den Browser. Anderer Port: `start.bat 8123`. |
+| Mit Python | Im Ordner `python3 -m http.server 8000` ausführen und `http://localhost:8000` öffnen |
+| Doppelklick auf `index.html` | **Nicht empfohlen.** Bei `file://` blockiert der Browser das Lesen der JSON-Dateien und die Web-Worker der Texterkennung. Screenshots werden dann **nicht** erkannt; die App sagt das. |
 
 ## Für weitere Nutzer
 
@@ -139,6 +140,16 @@ Ist der Stand älter als `profil.einstellungen.warnTageBuildAlter`, erscheint �
   - **zusammen 11,0 MB im Repo**
 
   Der Browser lädt beim ersten Screenshot nur einen Kern plus Sprachdaten, rund 7 MB, danach kommt alles aus dem Cache. Details in `vendor/tesseract/README.md`.
+- **So wird erkannt:**
+  - **Bildaufbereitung:** Pro Pixel zählt der hellste Farbkanal, damit auch oranger und blauer Text hell bleibt. Ein Schwellwert nach Otsu macht daraus schwarzen Text auf weißem Grund.
+  - **Layout:** Tesseract erkennt das Seitenlayout automatisch (PSM 3). Das hält Item-Bild und Rahmen vom Text getrennt.
+  - **Aufräumen:** Der Parser entfernt Fehlglyphen (◆ wird oft zu `o`/`¢`, das Gold-Icon zu `®`) und Bereichsangaben wie `[83 - 99]`.
+  - **Effekttexte:** Der Absatz nach „Imprinted:“ und Unique-Kräfte zählen nicht als Affixe.
+  - **Fußzeilen:** „Requires Level“, „Sell Value“ und „Durability“ werden übersprungen; „Tempers: 3/3“ wird trotzdem gelesen.
+  - **Katalog-Abgleich:** Affixnamen werden mit `katalog.json` abgeglichen. Typische OCR-Fehler wie „Thoms“ werden zu „Thorns“ korrigiert und markiert.
+  - **Aspekt:** Bei legendären Items leitet die App den Aspekt aus dem Namen ab („Sadistic Doom Casque“ → Sadistischer Aspekt).
+  - **Große Affixe:** Ein Stern vor einer Affixzeile merkt sie als „groß“ vor.
+- **Grenzen:** Die Zierschrift der Item-Namen wird oft falsch gelesen („Doom“ → „Dos“). Bei Uniques korrigiert der Katalog-Abgleich das; bei legendären Items ist der Name ohnehin zweitrangig, entscheidend ist der Aspekt.
 - Die App schlägt einen Slot vor (aus dem Eintrag in `wissen.json`, sonst aus dem Item-Typ), du bestätigst ihn.
 - Alle erkannten Felder erscheinen zur Korrektur. Affixzeilen haben eine Konfidenz und lassen sich einzeln bearbeiten, hinzufügen und löschen.
 - **Erst „Übernehmen“ schreibt ins Inventar.** Die Analyse sieht nie den rohen Erkennungstext.
