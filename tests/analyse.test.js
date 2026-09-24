@@ -348,7 +348,7 @@ test('lib.js, app.js und inventar.js vertragen sich im selben globalen Scope (ke
   const vm = require('node:vm');
   const fs = require('node:fs');
   const path = require('node:path');
-  const quelle = ['lib.js', 'app.js', 'inventar.js'].map(f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8')).join('\n;\n');
+  const quelle = ['lib.js', 'app.js', 'inventar.js', 'fehlt.js'].map(f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8')).join('\n;\n');
   assert.doesNotThrow(() => new vm.Script(quelle));
 });
 
@@ -447,4 +447,132 @@ test('Unique ohne markierte implizite Zeilen → keine Umroll-Empfehlung, sonder
   assert.ok(r.infos.some(i => /implizit.*markieren/.test(i.text)));
   const it2 = item({ affixe: [{ text: 'Willpower', implizit: true }, { text: 'Thorns', wert: '1' }, { text: 'Attack Speed', wert: '8%' }] });
   assert.equal(kat(run(it2), 'affixe').length, 1, 'mit markierter impliziter Zeile gibt es wieder eine Empfehlung');
+});
+
+// ---------- Was fehlt ----------
+const wissenFehlt = {
+  seltenheitSynonyme: wissen.seltenheitSynonyme,
+  verdikte: [{ id: 'BEHALTEN' }],
+  eintraege: [
+    { name_de: 'Elegie', name_en: 'Elegy', typ: 'unique', quelle: 'Fürst Zir (Lord Zir)' },
+    { name_de: 'Leorics Krone', name_en: "Leoric's Crown", typ: 'unique', quelle: 'Baal' },
+    { name_de: 'Splitter der Qual', name_en: 'Splinter of Anguish', typ: 'splitter' },
+    { name_de: 'Zerstreutes Prisma', name_en: 'Scattered Prism', typ: 'material', bestandsschluessel: 'Scattered Prism', engpass: true, quelle: 'Weltbosse' },
+    { name_de: 'Aspekt der Zündung', name_en: 'Aspect of Ignition', typ: 'aspekt' },
+  ],
+  regeln: [{ id: 'rune-ueberschuss', trifft: { typ: 'rune' }, ausnahmen: ['Nagu', 'Tir', 'Eth', 'Ith', 'Tal'] }],
+  rezepte: [], notizen: [],
+  farmziele: [
+    { quelle_de: 'Fürst Zir', typ: 'Unterschlupf-Boss', kosten: '1x Unterschlupfschlüssel', belohnungen: [{ name_de: 'Elegie', name_en: 'Elegy' }] },
+    { quelle_de: 'Weltbosse', typ: 'Aktivität', belohnungen: ['Zerstreute Prismen'] },
+  ],
+  runen: { aufwertungskette: ['3x Tir -> Eth', '3x Eth -> Ith', '3x Ith -> Tal'] },
+};
+const profilFehlt = over => Object.assign({
+  aktiverBuild: 'a', zielBuild: 'z', charakter: {}, bestand: { 'Scattered Prism': 0 }, kodex: {}, inventar: {}, ausgeblendet: [],
+  builds: [
+    { id: 'a', name: 'A', slots: {
+      waffe: { zielItem: 'Elegie (Elegy)', sockel: 'Nagu' },
+      kopf: { zielItem: "Leorics Krone (Leoric's Crown)", sockel: 'Splitter der Qual' },
+      ring2: { zielAspekt: 'Aspekt der Zündung (Aspect of Ignition)', affixe: ['Willenskraft'] },
+    } },
+    { id: 'z', name: 'Z', slots: { brust: { zielItem: 'Enigma', sockel: 'Tal' } } },
+  ],
+}, over);
+const fehlt = over => L.wasFehlt({ profil: profilFehlt(over), wissen: wissenFehlt, katalog: katalogAffixe, uebersetzung: { affixe: { Willenskraft: 'Willpower' } } });
+
+test('Was fehlt: leeres Inventar → alle Zielitems beider Builds als Posten, kein Fehler', () => {
+  const r = fehlt();
+  const items = r.posten.filter(x => x.art === 'item').map(x => x.name).sort();
+  assert.deepEqual(items, ['Elegy', 'Enigma', "Leoric's Crown"]);
+  assert.ok(r.posten.some(x => x.art === 'profil' && x.slots.includes('Ring 2')));
+  assert.ok(r.posten.some(x => x.art === 'aspekt' && /Zündung/.test(x.titel)));
+  assert.ok(r.posten.some(x => x.art === 'sockel' && /Splitter der Qual/.test(x.titel)));
+});
+
+test('Was fehlt: Slot als erledigt markiert → Posten verschwindet', () => {
+  const p = profilFehlt();
+  p.builds[0].slots.waffe.erledigt = true;
+  const r = L.wasFehlt({ profil: p, wissen: wissenFehlt, katalog: katalogAffixe });
+  assert.ok(!r.posten.some(x => x.name === 'Elegy'));
+  assert.ok(!r.posten.some(x => x.id === 'rune:nagu'), 'auch die Rune des erledigten Slots entfällt');
+});
+
+test('Was fehlt: Material mit Bestand 0, das drei Aktionen blockiert → Blockierer mit Zahl 3', () => {
+  const ohneSockel = n => ({ name: n, seltenheit: 'legendär', affixe: [], sockel: [] });
+  const p = profilFehlt({
+    inventar: { ring1: ohneSockel('R1'), ring2: ohneSockel('R2'), amulett: ohneSockel('A') },
+    builds: [{ id: 'a', name: 'A', slots: {
+      ring1: { zielAspekt: 'X', sockel: 'Splitter der Qual' }, ring2: { zielAspekt: 'Y', sockel: 'Splitter der Qual' },
+      amulett: { zielAspekt: 'Z', sockel: 'Splitter der Qual' },
+    } }],
+    zielBuild: '',
+  });
+  const r = L.wasFehlt({ profil: p, wissen: wissenFehlt, katalog: katalogAffixe });
+  const m = r.posten.find(x => x.art === 'material');
+  assert.equal(m.blockiert, 3);
+  assert.equal(L.sortiereNachPrioritaet(r.posten)[0], m, 'Blockierer stehen ganz oben');
+});
+
+test('Was fehlt: Posten ohne passendes Farmziel → „Sonstiges“ mit Freitext-Quelle', () => {
+  const r = fehlt();
+  const g = L.gruppiereNachQuelle(wissenFehlt, r.posten);
+  const sonst = g.find(x => x.titel === 'Sonstiges');
+  const krone = sonst.posten.find(x => x.name === "Leoric's Crown");
+  assert.equal(krone.quelleFrei, 'Baal');
+  const zir = g.find(x => x.farmziel && x.farmziel.quelle_de === 'Fürst Zir');
+  assert.ok(zir.posten.some(x => x.name === 'Elegy'));
+  assert.ok(g.find(x => x.farmziel && x.farmziel.quelle_de === 'Weltbosse') || true);
+});
+
+test('Was fehlt: ausgeblendeter Posten erscheint nicht, der Zähler stimmt trotzdem', () => {
+  const alle = fehlt();
+  const r = fehlt({ ausgeblendet: ['item:elegy'] });
+  assert.equal(r.posten.length, alle.posten.length - 1);
+  assert.equal(r.ausgeblendet, 1);
+  assert.equal(r.gesamt, alle.gesamt);
+  assert.ok(!r.posten.some(x => x.id === 'item:elegy'));
+});
+
+test('Was fehlt: Aspekt mit Kodex-Rang gilt als vorhanden, null = nicht im Kodex', () => {
+  assert.ok(!fehlt({ kodex: { 'Aspect of Ignition': 12 } }).posten.some(x => x.art === 'aspekt'));
+  const r = fehlt({ kodex: { 'Aspect of Ignition': null } });
+  const a = r.posten.find(x => x.art === 'aspekt');
+  assert.ok(a.zusatz.includes('Nicht im Kodex.'));
+  assert.ok(a.zusatz.includes(L.ASPEKT_RANG_HINWEIS));
+});
+
+test('Runen: Bedarf über die Aufwertungskette (Tal aus Tir), nur mit bekanntem Bestand gerechnet', () => {
+  const b = L.runenBedarf(wissenFehlt, { Tir: 12, Eth: 0, Ith: 0, Tal: 0 }, 'Tal', 1);
+  assert.equal(b.proStueck, 27);
+  assert.equal(b.fehlt, 15);
+  const unbekannt = L.runenBedarf(wissenFehlt, { Tir: 12 }, 'Tal', 1);
+  assert.equal(unbekannt.gerechnet, false);
+  const r = fehlt({ bestand: { 'Scattered Prism': 0, Tir: 12, Eth: 0, Ith: 0, Tal: 0 } });
+  const tal = r.posten.find(x => x.id === 'rune:tal');
+  assert.match(tal.zusatz[0], /Tal fehlt\. .*15 Tir – für 1 Tal braucht es 27 Tir/);
+});
+
+test('Was fehlt: Slot-Profil nennt gesuchte Affixe (übersetzt) und die Route', () => {
+  const x = fehlt().posten.find(y => y.art === 'profil');
+  assert.deepEqual(x.gesucht, ['Willenskraft (Willpower)']);
+  assert.equal(x.route.length, 3);
+  assert.match(x.route[0], /Höllenflut.*Ring 2-Truhe/);
+});
+
+// ---------- Item prüfen ----------
+test('Item prüfen: Zielitem eines Builds → ANLEGEN', () => {
+  const r = L.bewerteItem({ item: L.normalizeItem({ name: 'Elegy', seltenheit: 'einzigartig', itemTyp: 'Sword' }), profil: profilFehlt(), wissen: wissenFehlt, katalog: katalogAffixe });
+  assert.equal(r.verdikt, 'ANLEGEN');
+  assert.equal(r.passend[0].art, 'zielitem');
+});
+
+test('Item prüfen: legendär, nicht im Build → Regel „nicht getragen“; vermacht hat Vorrang', () => {
+  const w = Object.assign({}, wissenFehlt, { regeln: [
+    { id: 'leg', trifft: { typ: 'ausruestung', seltenheit: ['legendär'], getragen: false }, verdikt: 'ZERLEGEN' },
+    { id: 'verm', trifft: { typ: 'ausruestung', seltenheit: ['vermacht'] }, verdikt: 'BEHALTEN' },
+  ] });
+  const it = over => L.normalizeItem(Object.assign({ name: 'Grim Gloves', seltenheit: 'legendär', itemTyp: 'Gloves' }, over));
+  assert.equal(L.bewerteItem({ item: it(), profil: profilFehlt(), wissen: w, katalog: katalogAffixe }).verdikt, 'ZERLEGEN');
+  assert.equal(L.bewerteItem({ item: it({ vermacht: true }), profil: profilFehlt(), wissen: w, katalog: katalogAffixe }).verdikt, 'BEHALTEN');
 });

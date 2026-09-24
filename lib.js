@@ -623,7 +623,7 @@ function pruefeIntegritaet(wissen, profil) {
     if (!Object.prototype.hasOwnProperty.call(bestand, k)) out.bestandFehlt.push(k);
     else if (bestand[k] == null) out.bestandNull.push(k);
   }
-  for (const k of Object.keys(bestand)) if (!schluessel.includes(k)) out.bestandOhneMaterial.push(k);
+  for (const k of Object.keys(bestand)) if (!schluessel.includes(k) && !istRune(wissen, k)) out.bestandOhneMaterial.push(k);
   for (const b of asArray(profil && profil.builds)) {
     for (const k of Object.keys(b.slots || {})) if (!slotKey(k)) out.slotsUnbekannt.push(`${b.id}.${k}`);
   }
@@ -961,6 +961,393 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
   };
 }
 
+/* ================================================================
+   Runen
+   ================================================================ */
+
+/** Bekannte Runennamen: Regel-Ausnahmen von Runen-Regeln, wissen.runen, Einträge mit typ rune. */
+function runenNamen(wissen) {
+  const set = new Set();
+  for (const r of asArray(wissen && wissen.regeln)) {
+    if (asArray(r.trifft && r.trifft.typ).some(t => norm(t) === 'rune')) asArray(r.ausnahmen).forEach(a => set.add(itemText(a)));
+  }
+  asArray(wissen && wissen.eintraege).filter(e => norm(e.typ) === 'rune').forEach(e => set.add(e.name_en || e.name_de));
+  const ru = wissen && wissen.runen;
+  if (ru) {
+    asArray(ru.liste || ru.namen).forEach(n => set.add(itemText(n)));
+    runenKette(wissen).forEach(k => { set.add(k.von); set.add(k.nach); });
+  }
+  return [...set].filter(Boolean);
+}
+const istRune = (wissen, text) => runenNamen(wissen).some(r => norm(r) === norm(text));
+
+/**
+ * Aufwertungskette aus wissen.runen.aufwertungskette.
+ * Erlaubt: [{ "von": "Tir", "nach": "Eth", "menge": 3 }] oder ["3x Tir -> Eth"].
+ */
+function runenKette(wissen) {
+  const roh = asArray(wissen && wissen.runen && wissen.runen.aufwertungskette);
+  return roh.map(x => {
+    if (x && typeof x === 'object') return { von: x.von, nach: x.nach, menge: Number(x.menge) || 3 };
+    const m = String(x).match(/(\d+)\s*[x×]\s*([\p{L}]+)\s*[-–=]*>\s*([\p{L}]+)/u);
+    return m ? { von: m[2], nach: m[3], menge: Number(m[1]) } : null;
+  }).filter(k => k && k.von && k.nach);
+}
+
+/**
+ * Bedarf über die Aufwertungskette: Wie viele der untersten Rune fehlen für `anzahl` × `rune`?
+ * Nur rechnen, wenn alle Bestände der Kette bekannt sind – sonst nur die Kette zurückgeben.
+ */
+function runenBedarf(wissen, bestand, rune, anzahl = 1) {
+  const kette = runenKette(wissen);
+  const pfad = [];                         // von unten nach oben, endet bei `rune`
+  let aktuell = rune;
+  for (let guard = 0; guard < 20; guard++) {
+    const k = kette.find(x => norm(x.nach) === norm(aktuell));
+    if (!k) break;
+    pfad.unshift(k);
+    aktuell = k.von;
+  }
+  if (!pfad.length) return null;
+  const unterste = pfad[0].von;
+  // Wert jeder Stufe in Einheiten der untersten Rune
+  const wert = { [norm(unterste)]: 1 };
+  let w = 1;
+  for (const k of pfad) { w *= k.menge; wert[norm(k.nach)] = w; }
+  const stufen = [unterste, ...pfad.map(k => k.nach)];
+  const kettenText = pfad.map(k => `${k.menge}× ${k.von} → ${k.nach}`).join(', ');
+  const bestaende = stufen.map(n => ({ n, hat: bestandVon(bestand, n) }));
+  const proStueck = wert[norm(rune)];
+  if (bestaende.some(b => b.hat == null)) return { kettenText, unterste, proStueck, gerechnet: false };
+  const vorhanden = bestaende.reduce((sum, b) => sum + b.hat * wert[norm(b.n)], 0);
+  const fehlt = Math.max(0, anzahl * proStueck - vorhanden);
+  return { kettenText, unterste, proStueck, gerechnet: true, vorhanden, fehlt, bestaende };
+}
+
+/* ================================================================
+   Was fehlt – Beschaffung (Builds gegen Besitz)
+   ================================================================ */
+
+/** Beschaffungsroute für Slots ohne benanntes Zielitem (Logik, kein Spieldatum). */
+function profilRoute(slotDe) {
+  return [
+    `Höllenflut, gezielte ${slotDe}-Truhe`,
+    'Kuriositätenhändler mit Obols',
+    'Würfel: Upgrade to Legendary mit Abstimmungsprisma',
+  ];
+}
+const ASPEKT_RANG_HINWEIS = 'Ränge 17–21 kommen nur über vermachte Items.';
+
+/** Farmziele, zu denen ein Name gehört: als Belohnung genannt oder im Quelltext erwähnt. */
+function farmzieleFuer(wissen, name, quelleFrei) {
+  const q = norm(quelleFrei);
+  return asArray(wissen && wissen.farmziele).filter(f => {
+    if (name && asArray(f.belohnungen).some(b => textPasst(name, itemText(b)) || (b && typeof b === 'object' && [b.name_de, b.name_en].some(x => x && textPasst(name, x))))) return true;
+    return q && [f.quelle_de, f.quelle_en, f.quelle].map(norm).filter(Boolean).some(x => hasWords(q, x) || phraseIn(q, x));
+  });
+}
+
+/** Kodex-Rang eines Aspekts: Zahl = Rang, null = nicht im Kodex, undefined = unbekannt. */
+function kodexRang(kodex, aspekt) {
+  if (!kodex || !aspekt) return undefined;
+  const namen = [aspekt, ...String(aspekt).split(/[()]/).map(x => x.trim())].filter(Boolean);
+  for (const [k, v] of Object.entries(kodex)) {
+    if (namen.some(n => affixGleich(k, n) || textPasst(k, n))) return v == null || v === '' ? null : zahl(v, null);
+  }
+  return undefined;
+}
+
+/**
+ * Alle offenen Beschaffungs-Posten aus aktivem und Ziel-Build.
+ * Funktioniert auch mit leerem Inventar.
+ * @returns {{posten: object[], ausgeblendet: number}}
+ */
+function wasFehlt({ profil, wissen, katalog, uebersetzung }) {
+  const p = profil || {};
+  const inv = normalizeInventar(p.inventar);
+  const bestand = p.bestand || {};
+  const tab = Object.assign({}, (uebersetzung && uebersetzung.affixe) || uebersetzung || {}, (wissen && wissen.affixUebersetzungen) || {});
+  const builds = asArray(p.builds);
+  const aktiv = builds.find(b => b.id === p.aktiverBuild) || null;
+  const ziel = builds.find(b => b.id === p.zielBuild) || null;
+  const liste = [];
+  if (aktiv) liste.push({ rolle: 'aktiv', build: aktiv, anderer: ziel });
+  if (ziel && ziel !== aktiv) liste.push({ rolle: 'ziel', build: ziel, anderer: aktiv });
+
+  const map = new Map();
+  const add = (id, basis, rolle, slotDe) => {
+    let x = map.get(id);
+    if (!x) { x = Object.assign({ id, rollen: [], slots: [], detail: [], zusatz: [], blockiert: 0, farmziele: [], quelleFrei: '' }, basis); map.set(id, x); }
+    if (rolle && !x.rollen.includes(rolle)) x.rollen.push(rolle);
+    if (slotDe && !x.slots.includes(slotDe)) x.slots.push(slotDe);
+    return x;
+  };
+  const runenBedarfMap = new Map();
+
+  for (const { rolle, build, anderer } of liste) {
+    const runenInBuild = new Map();
+    for (const s of SLOTS) {
+      const sl = slotAus(build.slots, s.key);
+      if (!sl || sl.erledigt) continue;
+      const it = inv[s.key];
+      // Trägst du hier schon das Zielitem des anderen Builds, ist dieser Slot weiter als verlangt
+      const slAnderer = anderer && slotAus(anderer.slots, s.key);
+      const weiter = !!(it && slAnderer && slAnderer.zielItem && textPasst(it.name, slAnderer.zielItem));
+      const zielItem = String(sl.zielItem || '').trim();
+      const zielAspekt = String(sl.zielAspekt || '').trim();
+
+      // a) benannte Items
+      if (zielItem) {
+        const e = eintragZu(wissen, zielItem);
+        const hat = it && (textPasst(it.name, zielItem) || (e && [e.name_de, e.name_en].some(n => n && textPasst(it.name, n))));
+        if (!hat) {
+          add(`item:${norm(e ? (e.name_en || e.name_de) : zielItem)}`, {
+            art: 'item', titel: e ? bi(e.name_de, e.name_en) : zielItem, name: e ? (e.name_en || e.name_de) : zielItem,
+            quelleFrei: e && e.quelle ? listText(e.quelle) : (sl.quelle || ''),
+          }, rolle, s.de);
+        }
+      }
+      // 2) Slot-Profil: kein Zielitem, nur Aspekt → Profil fehlt, wenn der Slot leer ist oder ein Unique/anderes Teil trägt
+      if (!zielItem && zielAspekt && !weiter && (!it || istUnique(wissen, it.seltenheit))) {
+        const x = add(`profil:${rolle}:${s.key}`, {
+          art: 'profil', titel: `${s.de}: seltenes oder legendäres Teil`, name: zielAspekt, slot: s.de,
+          gesucht: asArray(sl.affixe).map(a => affixAnzeige(a, tab, p.charakter)), aspekt: zielAspekt,
+          route: profilRoute(s.de), quelleFrei: profilRoute(s.de).join(' · '),
+        }, rolle, s.de);
+        if (it) x.zusatz.push(`Aktuell: ${it.name || 'Item'} (${seltenheitKanon(wissen, it.seltenheit) || 'unbekannt'})`);
+      }
+      // b) Aspekte
+      if (zielAspekt && !weiter) {
+        const rang = kodexRang(p.kodex, zielAspekt);
+        const imItem = it && it.aspekt && textPasst(it.aspekt, zielAspekt);
+        if (!imItem && (rang === null || rang === undefined)) {
+          const e = eintragZu(wissen, zielAspekt);
+          const x = add(`aspekt:${norm(e ? (e.name_en || e.name_de) : zielAspekt)}`, {
+            art: 'aspekt', titel: e ? bi(e.name_de, e.name_en) : zielAspekt, name: e ? (e.name_en || e.name_de) : zielAspekt,
+            quelleFrei: e && e.quelle ? listText(e.quelle) : '',
+          }, rolle, s.de);
+          if (!x.zusatz.includes(ASPEKT_RANG_HINWEIS)) {
+            x.zusatz.push(rang === null ? 'Nicht im Kodex.' : 'Im Kodex nicht eingetragen (Bestand → Kodex).');
+            x.zusatz.push(ASPEKT_RANG_HINWEIS);
+          }
+        }
+      }
+      // c) Sockelinhalte (ohne Runen) und d) Runen
+      const soll = splitParts(sl.sockel).map(x => x.replace(/\s*\([^)]*\)\s*$/, '').trim()).filter(Boolean);
+      const ist = asArray(it && it.sockel).filter(x => x.gefuellt && x.inhalt).map(x => x.inhalt);
+      for (const req of soll) {
+        const drin = ist.some(x => textPasst(x, req));
+        if (istRune(wissen, req)) {
+          if (!drin) runenInBuild.set(norm(req), { name: req, n: (runenInBuild.get(norm(req)) || { n: 0 }).n + 1, slots: [...((runenInBuild.get(norm(req)) || {}).slots || []), s.de] });
+          continue;
+        }
+        if (drin) continue;
+        const e = eintragZu(wissen, req);
+        add(`sockel:${norm(e ? (e.name_en || e.name_de) : req)}`, {
+          art: 'sockel', titel: e ? bi(e.name_de, e.name_en) : req, name: e ? (e.name_en || e.name_de) : req,
+          quelleFrei: e && e.quelle ? listText(e.quelle) : '',
+        }, rolle, s.de);
+      }
+    }
+    // Runenbedarf: pro Build zählen, über beide Builds das Maximum
+    for (const [k, v] of runenInBuild) {
+      const alt = runenBedarfMap.get(k);
+      if (!alt || v.n > alt.n) runenBedarfMap.set(k, { ...v, rollen: [...new Set([...(alt ? alt.rollen : []), rolle])] });
+      else alt.rollen = [...new Set([...alt.rollen, rolle])];
+    }
+  }
+  for (const [k, v] of runenBedarfMap) {
+    const hat = bestandVon(bestand, v.name);
+    if (hat != null && hat >= v.n) continue;
+    const x = add(`rune:${k}`, {
+      art: 'rune', titel: `Rune ${v.name}`, name: v.name,
+      detail: [hat == null ? `Bestand unbekannt – gebraucht: ${v.n}` : `Bestand ${hat}, gebraucht: ${v.n}`],
+    }, null, null);
+    v.rollen.forEach(r => { if (!x.rollen.includes(r)) x.rollen.push(r); });
+    v.slots.forEach(sl => { if (!x.slots.includes(sl)) x.slots.push(sl); });
+    const b = runenBedarf(wissen, bestand, v.name, v.n - (hat || 0));
+    if (b && b.gerechnet) {
+      x.zusatz.push(b.fehlt > 0
+        ? `${v.name} fehlt. Mit deinen Beständen fehlen umgerechnet ${b.fehlt} ${b.unterste} – für 1 ${v.name} braucht es ${b.proStueck} ${b.unterste} (${b.kettenText}).`
+        : `${v.name} ist über die Aufwertung erreichbar: deine Bestände reichen (${b.kettenText}).`);
+    } else if (b) {
+      x.zusatz.push(`Aufwertungskette: ${b.kettenText}. Für 1 ${v.name} braucht es ${b.proStueck} ${b.unterste}.`);
+    }
+  }
+
+  // e) Materialien, die Aktionen blockieren (aus der Slot-Analyse, doppelte Aktionen nur einmal)
+  const gesehen = new Set();
+  const blockiert = new Map();
+  for (const { rolle, build, anderer } of liste) {
+    for (const s of SLOTS) {
+      const r = analysiereSlot({ slotKey: s.key, item: inv[s.key], build, andererBuild: anderer, charakter: p.charakter, bestand, wissen, katalog, uebersetzung });
+      for (const a of r.aktionen) {
+        if (!a.blockiert || !a.material) continue;
+        const key = `${s.key}|${a.kategorie}|${a.text}`;
+        if (gesehen.has(key)) continue;
+        gesehen.add(key);
+        const m = a.material;
+        const b = blockiert.get(m.schluessel) || { m, n: 0, rollen: new Set(), slots: new Set() };
+        b.n++; b.rollen.add(rolle); b.slots.add(s.de);
+        blockiert.set(m.schluessel, b);
+      }
+    }
+  }
+  for (const [schluessel, b] of blockiert) {
+    const e = materialEintraege(wissen).find(x => x.bestandsschluessel === schluessel);
+    const x = add(`material:${norm(schluessel)}`, {
+      art: 'material', titel: bi(b.m.de, b.m.en), name: b.m.en || b.m.de,
+      quelleFrei: e && e.quelle ? listText(e.quelle) : '', blockiert: b.n, engpass: b.m.engpass,
+      detail: [b.m.bestand == null ? 'Bestand unbekannt' : `Bestand ${b.m.bestand}`],
+    }, null, null);
+    b.rollen.forEach(r => { if (!x.rollen.includes(r)) x.rollen.push(r); });
+    b.slots.forEach(sl => { if (!x.slots.includes(sl)) x.slots.push(sl); });
+  }
+
+  // Farmziele zuordnen
+  const alle = [...map.values()];
+  for (const x of alle) x.farmziele = farmzieleFuer(wissen, x.art === 'profil' ? '' : x.name, x.quelleFrei);
+  const aus = new Set(asArray(p.ausgeblendet));
+  return { posten: alle.filter(x => !aus.has(x.id)), ausgeblendet: alle.filter(x => aus.has(x.id)).length, gesamt: alle.length };
+}
+
+/** Gruppierung nach Farmziel; Posten ohne Farmziel unter „Sonstiges“. Meiste offene Posten zuerst. */
+function gruppiereNachQuelle(wissen, posten) {
+  const gruppen = new Map();
+  const sonstiges = [];
+  for (const x of posten) {
+    if (!x.farmziele.length) { sonstiges.push(x); continue; }
+    for (const f of x.farmziele) {
+      const key = norm(f.quelle_de || f.quelle_en || f.quelle);
+      if (!gruppen.has(key)) gruppen.set(key, { farmziel: f, titel: farmQuelle(wissen, f), posten: [] });
+      gruppen.get(key).posten.push(x);
+    }
+  }
+  const out = [...gruppen.values()].sort((a, b) => b.posten.length - a.posten.length);
+  if (sonstiges.length) out.push({ farmziel: null, titel: 'Sonstiges', posten: sonstiges });
+  return out;
+}
+
+/** Reihenfolge nach Priorität: Blockierer, aktiver Build, Ziel-Build. */
+function sortiereNachPrioritaet(posten) {
+  const rang = x => (x.blockiert > 0 ? 0 : x.rollen.includes('aktiv') ? 1 : x.rollen.includes('ziel') ? 2 : 3);
+  return [...posten].sort((a, b) => rang(a) - rang(b) || (b.blockiert || 0) - (a.blockiert || 0) || a.titel.localeCompare(b.titel, 'de'));
+}
+
+/* ================================================================
+   Item prüfen – Verdikt für ein einzelnes (nicht getragenes) Item
+   ================================================================ */
+
+/** Kandidaten-Slots für ein Item (Ringe passen in beide Ringslots). */
+function kandidatenSlots(item, { katalog, wissen } = {}) {
+  const v = slotVorschlag({ itemTyp: item.itemTyp, name: item.name, katalog, wissen });
+  if (!v.key) return [];
+  return v.key === 'ring1' || v.key === 'ring2' ? ['ring1', 'ring2'] : [v.key];
+}
+
+/** Englischer Item-Typ → deutsche Bezeichnung (für Regeln wie itemTyp: ["Brustschutz"]). */
+function itemTypVarianten(itemTyp, uebersetzung) {
+  const tab = (uebersetzung && uebersetzung.itemTypen) || {};
+  const out = [itemTyp];
+  const key = Object.keys(tab).find(k => norm(k) === norm(itemTyp));
+  if (key) out.push(...asArray(tab[key]));
+  return out.filter(Boolean);
+}
+
+/** Passende Regel für ein Ausrüstungsteil über trifft (typ ausruestung, seltenheit, itemTyp, getragen). */
+function regelFuerItem(wissen, item, { getragen = false, imBuild = false, uebersetzung } = {}) {
+  const selt = [seltenheitKanon(wissen, item.seltenheit), item.vermacht ? 'vermacht' : ''].filter(Boolean).map(norm);
+  const typen = itemTypVarianten(item.itemTyp, uebersetzung).map(norm);
+  const treffer = [];
+  for (const r of asArray(wissen && wissen.regeln)) {
+    const t = r.trifft || {};
+    if (!asArray(t.typ).some(x => ['ausruestung', 'ausrüstung', 'item', 'gear'].includes(norm(x)))) continue;
+    const s = asArray(t.seltenheit).map(x => norm(seltenheitKanon(wissen, x)));
+    if (s.length && !s.some(x => selt.includes(x))) continue;
+    const it = asArray(t.itemTyp).map(norm);
+    if (it.length && !it.some(x => typen.some(y => y === x || hasWords(y, x)))) continue;
+    if (t.getragen === true && !getragen) continue;
+    if (t.getragen === false && getragen) continue;
+    if (t.nichtImBuild === true && imBuild) continue;
+    // Vermacht ist die stärkere Aussage als „legendär“ – Regeln dafür haben Vorrang
+    treffer.push({ r, genauigkeit: Object.keys(t).length + (it.length ? 2 : 0) + (s.includes('vermacht') ? 3 : 0) });
+  }
+  treffer.sort((a, b) => b.genauigkeit - a.genauigkeit);
+  return treffer.map(x => x.r);
+}
+
+/**
+ * Bewertet ein Item gegen beide Builds, das getragene Item und die Regeln aus wissen.json.
+ * Reine Regelanwendung – keine Roll-Bereiche, keine DPS.
+ */
+function bewerteItem({ item, profil, wissen, katalog, uebersetzung }) {
+  const p = profil || {};
+  const tab = Object.assign({}, (uebersetzung && uebersetzung.affixe) || {}, (wissen && wissen.affixUebersetzungen) || {});
+  const inv = normalizeInventar(p.inventar);
+  const builds = asArray(p.builds);
+  const rollen = [['aktiv', builds.find(b => b.id === p.aktiverBuild)], ['ziel', builds.find(b => b.id === p.zielBuild)]]
+    .filter(([, b]) => b).filter(([r, b], i, arr) => !(r === 'ziel' && arr[0] && arr[0][1] === b));
+  const slots = kandidatenSlots(item, { katalog, wissen });
+  const passend = [];
+  const zaehle = (it, sl) => {
+    const ziele = asArray(sl.affixe);
+    const treffer = ziele.filter(z => asArray(it && it.affixe).some(a => affixPasst(a.text, z, tab, p.charakter)));
+    return { treffer: treffer.length, von: ziele.length, namen: treffer };
+  };
+  const e = eintragZu(wissen, item.name);
+  for (const [rolle, b] of rollen) {
+    for (const key of slots) {
+      const sl = slotAus(b.slots, key);
+      if (!sl) continue;
+      const sDe = SLOT_BY_KEY[key].de;
+      const getragen = inv[key];
+      if (sl.zielItem && (textPasst(item.name, sl.zielItem) || (e && [e.name_de, e.name_en].some(n => n && textPasst(n, sl.zielItem))))) {
+        const hatSchon = getragen && textPasst(getragen.name, item.name);
+        passend.push({ rolle, build: b.name, slot: sDe, art: 'zielitem', text: hatSchon ? `Zielitem – du trägst es schon (Duplikat)` : 'Zielitem dieses Slots', hatSchon });
+        continue;
+      }
+      if (!sl.zielItem && sl.zielAspekt && !istUnique(wissen, item.seltenheit)) {
+        const c = zaehle(item, sl), g = getragen ? zaehle(getragen, sl) : null;
+        const aspektPasst = item.aspekt && textPasst(item.aspekt, sl.zielAspekt);
+        if (c.treffer >= 2 || aspektPasst) {
+          passend.push({
+            rolle, build: b.name, slot: sDe, art: 'profil', treffer: c.treffer, von: c.von, aspektPasst,
+            besser: g ? c.treffer > g.treffer : true, getragenTreffer: g ? g.treffer : null,
+            text: `${c.treffer}/${c.von} Zielaffixe${aspektPasst ? ', Aspekt passt' : ''}${g ? ` – getragen: ${g.treffer}/${c.von}` : ' – Slot ist leer'}`,
+          });
+        }
+      }
+    }
+  }
+  const regeln = regelFuerItem(wissen, item, { getragen: false, imBuild: passend.length > 0, uebersetzung });
+  const gruende = [];
+  let verdikt = '', quelle = '';
+  const ziel = passend.find(x => x.art === 'zielitem' && !x.hatSchon);
+  const upgrade = passend.find(x => x.art === 'profil' && x.besser);
+  if (ziel) {
+    verdikt = 'ANLEGEN'; quelle = 'build';
+    gruende.push(`${ziel.slot}: Zielitem im ${ziel.rolle === 'aktiv' ? 'aktuellen' : 'Ziel-'}Build „${ziel.build}“.`);
+  } else if (upgrade) {
+    verdikt = 'BEHALTEN'; quelle = 'build';
+    gruende.push(`${upgrade.slot} im Build „${upgrade.build}“: ${upgrade.text}. Mehr Zielaffixe als das getragene Teil – Kandidat zum Anlegen oder Umbauen.`);
+  } else if (e && e.verdikt) {
+    verdikt = e.verdikt; quelle = 'eintrag';
+    if (e.begruendung) gruende.push(e.begruendung);
+  } else if (regeln.length) {
+    verdikt = regeln[0].verdikt || ''; quelle = 'regel';
+    if (regeln[0].begruendung) gruende.push(regeln[0].begruendung);
+  }
+  // Aspekt und Kodex
+  let kodexHinweis = '';
+  if (item.aspekt) {
+    const rang = kodexRang(p.kodex, item.aspekt);
+    kodexHinweis = rang == null
+      ? `Aspekt „${item.aspekt}“: ${rang === null ? 'nicht im Kodex' : 'Kodex-Stand unbekannt'}.`
+      : `Aspekt „${item.aspekt}“: im Kodex, Rang ${rang}.`;
+  }
+  return { verdikt, quelle, gruende, passend, regeln, eintrag: e, kodexHinweis, slots };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     SLOTS, SLOT_BY_KEY, SLOT_ALIAS, slotKey, slotAus, norm, tokens, hasWords, wordEq, phraseEq, phraseIn, textPasst, bi, itemText, listText,
@@ -970,5 +1357,7 @@ if (typeof module !== 'undefined' && module.exports) {
     reihenfolgeNotiz, STANDARD_REIHENFOLGE, KATEGORIE_LABEL, analysiereSlot, PRIO_RANG, TEXT,
     slotVorschlag, parseTooltip, ocrZeile, aspektAusName, namenAbgleich, namenInText, distanz, itemTypAus,
     affixVarianten, affixPasst, affixVergleichbar, affixAnzeige,
+    runenNamen, istRune, runenKette, runenBedarf, wasFehlt, gruppiereNachQuelle, sortiereNachPrioritaet, farmzieleFuer, kodexRang,
+    profilRoute, ASPEKT_RANG_HINWEIS, kandidatenSlots, regelFuerItem, bewerteItem, itemTypVarianten,
   };
 }

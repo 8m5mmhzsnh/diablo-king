@@ -230,6 +230,44 @@ Die Analyse braucht sie für „Aspekt überprägen“ und das Rezept `reroll-af
 **`data/katalog.json`:** `{ "kategorien": { "uniques": { "typ", "anzahl", "einträge": [{ "slug", "name_en", "name_quelle" }] }, … } }`.
 Die Vorschlagslisten nutzen `uniques`, `aspekte`, `itemTypen` und `affixe`.
 
+## Was fehlt (Beschaffung)
+
+Reiter **„Was fehlt“**: aktiver und Ziel-Build gegen das, was du hast (Inventar, Bestand, Kodex, erledigt-Häkchen). Er funktioniert auch mit leerem Inventar. „Nächster Schritt“ ist das Gegenstück für Aktionen an Items, die du schon hast.
+
+**Arten von Posten:**
+- **Item:** ein benanntes Zielitem fehlt.
+- **Slot-Profil:** Der Slot hat nur einen Zielaspekt. Angezeigt werden die gesuchten Affixe, der Aspekt und die Route: Höllenflut-Truhe, Obols, Upgrade to Legendary.
+- **Aspekt:** fehlt im Kodex.
+- **Sockel:** ein Splitter oder Edelstein fehlt.
+- **Rune:** Der Bestand reicht nicht.
+- **Material:** Bestand 0, blockiert Aktionen. Angezeigt wird, wie viele.
+
+**Ansichten:**
+- **Nach Quelle** (Standard): gruppiert nach Farmziel, die Gruppe mit den meisten offenen Posten zuerst. Posten ohne passendes Farmziel landen unter „Sonstiges“, mit dem Button „Farmziel ergänzen“.
+- **Nach Priorität:** Blockierer, dann aktiver Build, Ziel-Build, Wechselkriterien und offene Aufgaben.
+
+Pro Posten gibt es die Buttons „In die Sammelliste“ und „Ausblenden“ (`profil.ausgeblendet`). Dazu kommt „Als Text kopieren“ für den Chat.
+
+**Runen und Kodex** pflegst du im Reiter **Bestand**:
+- **Runen** stehen in `profil.bestand` mit dem Runennamen als Schlüssel, z. B. `"Nagu": 2`.
+- **Kodex** steht in `profil.kodex`, z. B. `{ "Sadistic Aspect": 15, "Aspect of Ignition": null }`. Eine Zahl ist der Rang, `null` bedeutet nicht im Kodex, ein fehlender Schlüssel unbekannt.
+- **Runen-Aufwertung:** Mit einer Kette in `wissen.runen.aufwertungskette` rechnet die App den Bedarf aus. Die Kette wird so angegeben: `["3x Tir -> Eth", "3x Eth -> Ith"]` oder `[{ "von": "Tir", "nach": "Eth", "menge": 3 }]`. Ist ein Bestand in der Kette unbekannt, zeigt sie nur die Kette.
+
+## Item prüfen
+
+Reiter **„Item prüfen“**: Screenshot eines gefundenen Items einfügen, das Verdikt erscheint sofort über den korrigierbaren Werten. Die Bewertung läuft in dieser Reihenfolge:
+1. **Zielitem** eines Slots im aktiven oder Ziel-Build → ANLEGEN (bzw. „Duplikat“, wenn du es schon trägst).
+2. **Slot mit Zielaspekt:** Zielaffixe zählen, bei Deutsch/Englisch über `data/uebersetzungen.json`, dazu der Aspekt. Hat das Item mehr Treffer als das getragene Teil → BEHALTEN als Upgrade-Kandidat.
+3. Sonst das Verdikt des **Eintrags** in `wissen.json`.
+4. Sonst die passendste **Regel** (`trifft`: typ ausruestung, seltenheit, itemTyp, getragen). Vermacht hat Vorrang vor legendär. Weitere passende Regeln werden mit angezeigt.
+
+Dazu zeigt die App den Kodex-Stand des Aspekts. Von dort geht es direkt „In die Truhe“ oder „Ins Inventar“.
+Englische Item-Typen werden über `uebersetzungen.json → itemTypen` auf die deutschen Typen der Regeln abgebildet („Chest Armor“ → „Brustschutz“).
+
+## Truhe (Stash)
+
+Unten im Inventar: Items, die nicht angelegt sind, aber zur Verfügung stehen (`profil.stash`, gleiche Struktur wie Inventar-Items plus `id` und `notiz`). Jede Karte zeigt ihr Verdikt und wo sie in deine Builds passt. **Anlegen** tauscht mit dem Slot, das bisherige Item wandert in die Truhe.
+
 ## Tests
 
 ```
@@ -243,7 +281,9 @@ Die Parser-Tests laufen gegen diese Ausgaben. So lässt sich jede Parser-Änderu
 
 - **Suche** (Startseite): großes Suchfeld, darunter die Sammelliste
 - **Builds**: anlegen, bearbeiten, aktiv/Ziel setzen, Guide-Text importieren, Wechselkriterien
-- **Inventar**: Items per Screenshot oder von Hand erfassen, Analyse pro Slot
+- **Inventar**: Charakterbogen mit aufklappbaren Slots, Analyse pro Slot, darunter die Truhe (Stash)
+- **Item prüfen**: Screenshot → Verdikt (behalten, umbauen, würfeln, zerlegen …)
+- **Was fehlt**: Beschaffung nach Quelle oder Priorität
 - **Bestand**: Materialmengen bearbeiten
 - **Nächster Schritt**: alle Aktionen nach Priorität, Engpässe, Wechselkriterien, Aufgaben
 - **Checkliste**: Slots des aktiven Builds mit Quelle und Häkchen, Wechselkriterien des Ziel-Builds, offene Aufgaben

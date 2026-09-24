@@ -173,6 +173,10 @@ function normalizeProfil(p) {
   if (!p.charakter || typeof p.charakter !== 'object') p.charakter = {};
   for (const k of ['qualstufe', 'paragon']) if (!(k in p.charakter)) p.charakter[k] = '';
   p.inventar = normalizeInventar(p.inventar);
+  if (!p.kodex || typeof p.kodex !== 'object' || Array.isArray(p.kodex)) p.kodex = {};
+  if (!Array.isArray(p.ausgeblendet)) p.ausgeblendet = [];
+  p.stash = (Array.isArray(p.stash) ? p.stash : []).map((x, i) => Object.assign(normalizeItem(x) || leeresItem(),
+    { id: (x && x.id) || `s${i}${Date.now().toString(36)}`, notiz: (x && x.notiz) || '' }));
   if (!p.bestand || typeof p.bestand !== 'object' || Array.isArray(p.bestand)) p.bestand = {};
   p.einstellungen = Object.assign({ warnTageBuildAlter: 14 }, p.einstellungen || {});
   for (const k of ['builds', 'sammelliste', 'offeneAufgaben', 'abweichungen']) if (!Array.isArray(p[k])) p[k] = [];
@@ -268,6 +272,7 @@ async function loadUebersetzungen() {
   let u = r.ok ? r.data : lsGet(LS.uebersetzungen, null);
   if (r.ok) lsSet(LS.uebersetzungen, u);
   state.uebersetzung = (u && u.affixe) || {};
+  state.uebersetzungItemTypen = (u && u.itemTypen) || {};
   state.uebersetzungQuelle = r.ok ? FILES.uebersetzungen : u ? 'Arbeitskopie im Browser' : `nicht geladen (${r.error})`;
 }
 function katalogZusammenfassung() {
@@ -674,9 +679,11 @@ function render() {
     case 'farmziele': main.innerHTML = viewFarmziele(); break;
     case 'wissen': main.innerHTML = state.eintragEditor ? viewEintragEditor() : viewWissen(); break;
     case 'abweichungen': main.innerHTML = viewAbweichungen(); break;
-    case 'inventar': main.innerHTML = state.invEditor ? viewInvEditor() : viewInventar(); break;
+    case 'inventar': main.innerHTML = state.invEditor && state.invEditor.modus !== 'pruefen' ? viewInvEditor() : viewInventar(); break;
     case 'naechster': main.innerHTML = viewNaechster(); break;
     case 'bestand': main.innerHTML = viewBestand(); break;
+    case 'fehlt': main.innerHTML = viewFehlt(); break;
+    case 'pruefen': main.innerHTML = state.invEditor && state.invEditor.modus === 'pruefen' ? viewInvEditor() : viewPruefen(); break;
     default:
       if (state.eintragEditor) main.innerHTML = viewEintragEditor();
       else renderSuche(main);

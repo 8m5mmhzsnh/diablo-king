@@ -90,7 +90,10 @@ function aktionHtml(a, extra = '') {
 
 function analyseHtml({ rolle, build, r }) {
   const titel = rolle === 'aktiv' ? `Aktueller Build „${esc(build.name)}“` : rolle === 'ziel' ? `Ziel-Build „${esc(build.name)}“` : 'Kein Build';
-  const infos = r.infos.map(i => `<li class="hinweis ${i.art}">${INFO_ICON[i.art] || 'ℹ'} ${esc(i.text)}</li>`).join('');
+  const li = i => `<li class="hinweis ${i.art}">${INFO_ICON[i.art] || 'ℹ'} ${esc(i.text)}</li>`;
+  // Warnungen immer sichtbar, reine Infos und Unsicherheiten eingeklappt
+  const warn = r.infos.filter(i => i.art === 'warn').map(li).join('');
+  const rest = r.infos.filter(i => i.art !== 'warn');
   let rf = '';
   if (r.reihenfolge.length) {
     const n = reihenfolgeNotiz(state.wissen);
@@ -99,30 +102,39 @@ function analyseHtml({ rolle, build, r }) {
       ${n.index >= 0 ? `<a href="#" data-act="goto-notiz" data-i="${n.index}">Warum diese Reihenfolge? → Notiz</a>`
         : '<span class="small muted">Notiz „In welcher Reihenfolge bearbeite ich ein Item?“ fehlt in wissen.json.</span>'}</div>`;
   }
-  return `<div class="analyse ${rolle}">
-    <div class="analyse-titel">${rolle === 'ziel' ? '<span class="badge ziel">Ziel</span>' : rolle === 'aktiv' ? '<span class="badge aktiv">Aktiv</span>' : ''} ${titel}</div>
-    ${r.aktionen.length ? `<ul class="aktionen">${r.aktionen.map(a => aktionHtml(a)).join('')}</ul>` : '<p class="small muted">Keine Aktion nötig.</p>'}
+  const inhalt = `${r.aktionen.length ? `<ul class="aktionen">${r.aktionen.map(a => aktionHtml(a)).join('')}</ul>` : '<p class="small muted">Keine Aktion nötig.</p>'}
     ${rf}
-    ${infos ? `<ul class="hinweise">${infos}</ul>` : ''}
-  </div>`;
+    ${warn ? `<ul class="hinweise">${warn}</ul>` : ''}
+    ${rest.length ? `<details class="mehr-hinweise"><summary>Weitere Hinweise (${rest.length})</summary><ul class="hinweise">${rest.map(li).join('')}</ul></details>` : ''}`;
+  const badge = rolle === 'ziel' ? '<span class="badge ziel">Ziel</span>' : rolle === 'aktiv' ? '<span class="badge aktiv">Aktiv</span>' : '';
+  if (rolle === 'ziel') {
+    return `<details class="analyse ziel"><summary class="analyse-titel">${badge} ${titel} – ${r.aktionen.length} Aktion${r.aktionen.length === 1 ? '' : 'en'}</summary>${inhalt}</details>`;
+  }
+  return `<div class="analyse ${rolle}"><div class="analyse-titel">${badge} ${titel}</div>${inhalt}</div>`;
 }
+
+/* ---------- Seltenheit → Farbe (Diablo-Farben) ---------- */
+const RARITAET = { 'gewöhnlich': 'common', 'magisch': 'magic', 'selten': 'rare', 'legendär': 'legendary', 'einzigartig': 'unique', 'mythisch': 'mythic' };
+const raritaet = it => (it ? RARITAET[selKanon(it.seltenheit)] || 'none' : 'leer');
+const SLOT_KUERZEL = { kopf: 'Hm', brust: 'Br', handschuhe: 'Hd', hose: 'Hs', stiefel: 'St', amulett: 'Am', ring1: 'R1', ring2: 'R2', waffe: 'Wf', fokus: 'Fk' };
 
 function itemKurzHtml(it) {
   const tags = [
-    it.seltenheit && `<span class="tag">${esc(seltenheitAnzeige(selKanon(it.seltenheit)))}</span>`,
     it.vermacht && '<span class="tag warn">vermacht</span>',
     it.gegenstandsmacht && `<span class="tag">${esc(it.gegenstandsmacht)} GM</span>`,
     `<span class="tag">${it.quelle === 'ocr' ? 'OCR, bestätigt' : 'manuell'}</span>`,
   ].filter(Boolean).join('');
-  const aff = it.affixe.map(a => `<li>${a.wert ? `<b>${esc(a.wert)}</b> ` : ''}${esc(a.text)}
+  const aff = it.affixe.map(a => `<li class="${a.gross ? 'gross' : ''}${a.verzaubert ? ' verz' : ''}">${a.wert ? `<b>${esc(a.wert)}</b> ` : ''}${esc(a.text)}
     ${a.implizit ? '<span class="mini">impl.</span>' : ''}${a.gross ? '<span class="mini gross">groß</span>' : ''}${a.verzaubert ? '<span class="mini verz">verz.</span>' : ''}${a.schwach ? '<span class="mini">schwach</span>' : ''}</li>`).join('');
   const sock = it.sockel.length ? it.sockel.map(s => s.gefuellt && s.inhalt ? esc(s.inhalt) : '<i>leer</i>').join(', ') : 'keiner';
-  return `<div class="item-name">${esc(it.name || '(ohne Namen)')} ${it.stand ? staleIcon(it.stand) : ''}</div>
-    <div class="small muted">${esc(it.itemTyp || '')}</div>
+  return `<div class="item-kopf r-${raritaet(it)}">
+      <div class="item-name">${esc(it.name || '(ohne Namen)')} ${it.stand ? staleIcon(it.stand) : ''}</div>
+      <div class="item-typ">${esc([seltenheitAnzeige(selKanon(it.seltenheit)), it.itemTyp].filter(Boolean).join(' · '))}</div>
+    </div>
     <div>${tags}</div>
+    ${it.aspekt ? `<div class="item-aspekt">★ ${esc(it.aspekt)}</div>` : ''}
     ${aff ? `<ul class="affixe">${aff}</ul>` : '<p class="small muted">Keine Affixe erfasst.</p>'}
     <div class="kv small">
-      ${it.aspekt ? `<span class="k">Aspekt:</span> ${esc(it.aspekt)}<br>` : ''}
       <span class="k">Sockel:</span> ${sock} ·
       <span class="k">Härtung:</span> ${it.haertungen.max ? `${it.haertungen.genutzt}/${it.haertungen.max}` : '–'}${it.haertungen.affix ? ` (${esc(it.haertungen.affix)})` : ''} ·
       <span class="k">Vollendung:</span> ${it.vollendung.stufe}/${it.vollendung.max}
@@ -130,45 +142,170 @@ function itemKurzHtml(it) {
     </div>`;
 }
 
-/* ---------------- Ansicht: Inventar ---------------- */
+/* ---------------- Ansicht: Inventar (Charakterbogen) ---------------- */
 
-function viewInventar() {
+const LINKS = ['kopf', 'brust', 'handschuhe', 'hose', 'stiefel', 'waffe'];
+const RECHTS = ['amulett', 'ring1', 'ring2', 'fokus'];
+state.offen = state.offen || new Set();   // aufgeklappte Slots/Truhen-Items, bleibt beim Neuzeichnen erhalten
+
+function slotKarte(key) {
   const p = state.profil;
+  const s = SLOT_BY_KEY[key];
+  const it = p.inventar[key];
   const ab = aktivBuild();
-  const c = p.charakter;
-  const cards = SLOTS.map(s => {
-    const it = p.inventar[s.key];
-    const sl = ab && ab.slots[s.key];
-    const ziel = sl ? [sl.zielItem, sl.zielAspekt && `Aspekt: ${sl.zielAspekt}`].filter(Boolean).join(' · ') : '';
-    return `<div class="card inv-card" data-slot="${s.key}" tabindex="0">
-      <div class="inv-head"><b>${esc(s.de)}</b> <span class="muted small">(${esc(s.en)})</span>
-        ${ziel ? `<div class="small muted">Ziel: ${esc(ziel)}</div>` : ''}</div>
+  const sl = ab && ab.slots[key];
+  const ziel = sl ? [sl.zielItem, sl.zielAspekt && `Aspekt: ${sl.zielAspekt}`].filter(Boolean).join(' · ') : '';
+  const analysen = analysenFuerSlot(key);
+  const aktionen = analysen.flatMap(x => x.r.aktionen);
+  const hoch = aktionen.filter(a => a.prio === 'hoch').length;
+  const zaehler = aktionen.length
+    ? `<span class="slot-zaehler${hoch ? ' hoch' : ''}" title="${aktionen.length} offene Aktionen">${aktionen.length}</span>` : '';
+  return `<details class="d4-slot r-${raritaet(it)}" data-slot="${key}" data-offen="slot:${key}" ${state.offen.has('slot:' + key) ? 'open' : ''}>
+    <summary>
+      <span class="slot-icon">${SLOT_KUERZEL[key]}</span>
+      <span class="slot-text">
+        <span class="slot-label">${esc(s.de)}</span>
+        <span class="slot-item">${it ? esc(it.name || '(ohne Namen)') : '<i>leer</i>'}</span>
+        ${it ? `<span class="slot-sub">${esc([it.itemTyp, it.gegenstandsmacht && it.gegenstandsmacht + ' GM', it.vermacht && 'vermacht'].filter(Boolean).join(' · '))}</span>` : ''}
+      </span>
+      ${zaehler}
+    </summary>
+    <div class="slot-body inv-card" data-slot="${key}" tabindex="0">
+      ${ziel ? `<div class="small muted">Ziel (aktiv): ${esc(ziel)}</div>` : ''}
       ${it ? `${itemKurzHtml(it)}
         <div class="btn-row">
-          <button class="btn" data-act="inv-edit" data-slot="${s.key}">Bearbeiten</button>
-          <label class="btn">Neuer Screenshot<input type="file" accept="image/*" hidden data-inv-file="${s.key}"></label>
-          <button class="btn danger" data-act="inv-del" data-slot="${s.key}">Entfernen</button>
+          <button class="btn" data-act="inv-edit" data-slot="${key}">Bearbeiten</button>
+          <label class="btn">Neuer Screenshot<input type="file" accept="image/*" hidden data-inv-file="${key}"></label>
+          <button class="btn" data-act="inv-in-truhe" data-slot="${key}">In die Truhe</button>
+          <button class="btn danger" data-act="inv-del" data-slot="${key}">Entfernen</button>
         </div>`
-      : `<label class="drop" data-slot="${s.key}">
-          <input type="file" accept="image/*" hidden data-inv-file="${s.key}">
+      : `<label class="drop" data-slot="${key}">
+          <input type="file" accept="image/*" hidden data-inv-file="${key}">
           <b>Screenshot hier einfügen</b>
           <span class="small muted">tippen zum Auswählen · Strg+V · hineinziehen</span>
         </label>
-        <button class="btn" data-act="inv-manuell" data-slot="${s.key}">Manuell erfassen</button>`}
-      ${analysenFuerSlot(s.key).map(analyseHtml).join('')}
-    </div>`;
-  }).join('');
-
-  return `
-    ${GRENZEN_HTML}
-    <div class="inv-top">
-      <label class="btn primary">📷 Screenshot wählen<input type="file" accept="image/*" hidden data-inv-file=""></label>
-      <span class="small muted">oder irgendwo einfügen (Strg+V) – der Slot wird vorgeschlagen.</span>
+        <button class="btn" data-act="inv-manuell" data-slot="${key}">Manuell erfassen</button>`}
+      ${analysen.map(analyseHtml).join('')}
     </div>
-    <div class="kv small">Qualstufe: <b>${esc(c.qualstufe || '–')}</b> · Paragon: <b>${esc(c.paragon || '–')}</b>
-      <a href="#" data-act="open-dateien">ändern</a></div>
-    <div class="inv-grid">${cards}</div>
-    <p class="small"><a href="#" data-act="goto-tab" data-tab="bestand">Material-Bestand bearbeiten →</a></p>`;
+  </details>`;
+}
+
+function viewInventar() {
+  const p = state.profil;
+  const c = p.charakter;
+  const ab = aktivBuild(), zb = zielBuild();
+  const belegt = SLOTS.filter(s => p.inventar[s.key]).length;
+  return `
+    <section class="d4-panel charsheet">
+      <header class="d4-titel">
+        <div>
+          <div class="char-name">${esc(c.name || 'Charakter')}</div>
+          <div class="char-sub">${esc([c.klasse, c.stufe && `Stufe ${c.stufe}`].filter(Boolean).join(' · '))}</div>
+        </div>
+        <div class="char-werte">
+          <span><b>${esc(c.qualstufe || '–')}</b> Qual</span>
+          <span><b>${esc(c.paragon || '–')}</b> Paragon</span>
+          <a href="#" data-act="open-dateien" title="Charakter bearbeiten">✎</a>
+        </div>
+      </header>
+      <div class="char-builds small">Aktiv: <b>${esc(ab ? ab.name : '–')}</b> · Ziel: <b>${esc(zb ? zb.name : '–')}</b> · ${belegt}/10 Slots erfasst</div>
+      <div class="inv-top">
+        <label class="btn primary">📷 Screenshot<input type="file" accept="image/*" hidden data-inv-file=""></label>
+        <button class="btn" data-act="alle-auf">Alle aufklappen</button>
+        <button class="btn" data-act="alle-zu">Alle zuklappen</button>
+        <span class="small muted">Strg+V fügt überall ein – der Slot wird vorgeschlagen.</span>
+      </div>
+      <div class="charsheet-grid">
+        <div class="charsheet-col">${LINKS.map(slotKarte).join('')}</div>
+        <div class="charsheet-col">${RECHTS.map(slotKarte).join('')}</div>
+      </div>
+    </section>
+    ${viewTruhe()}
+    ${GRENZEN_HTML}`;
+}
+
+/* ---------------- Truhe (Stash) ---------------- */
+
+function besterPlatz(b) {
+  const z = b.passend.find(x => x.art === 'zielitem');
+  if (z) return `${z.slot} · ${z.build}: ${z.hatSchon ? 'Zielitem (schon getragen)' : 'Zielitem'}`;
+  const pr = [...b.passend].filter(x => x.art === 'profil').sort((x, y) => y.treffer - x.treffer)[0];
+  return pr ? `${pr.slot} · ${pr.build}: ${pr.text}` : '';
+}
+
+function viewTruhe() {
+  const liste = state.profil.stash;
+  const karten = liste.map(it => {
+    const b = bewerteItem({ item: it, profil: state.profil, wissen: state.wissen, katalog: state.katalog, uebersetzung: { affixe: state.uebersetzung, itemTypen: state.uebersetzungItemTypen } });
+    const slots = b.slots.length ? b.slots : SLOTS.map(s => s.key);
+    const platz = besterPlatz(b);
+    return `<details class="d4-slot r-${raritaet(it)}" data-offen="stash:${esc(it.id)}" ${state.offen.has('stash:' + it.id) ? 'open' : ''}>
+      <summary>
+        <span class="slot-icon">${b.slots[0] ? SLOT_KUERZEL[b.slots[0]] : '?'}</span>
+        <span class="slot-text">
+          <span class="slot-item">${esc(it.name || '(ohne Namen)')}</span>
+          <span class="slot-sub">${esc([it.itemTyp, it.gegenstandsmacht && it.gegenstandsmacht + ' GM', it.vermacht && 'vermacht'].filter(Boolean).join(' · '))}</span>
+          ${platz ? `<span class="slot-passt">${esc(platz)}</span>` : ''}
+        </span>
+        ${b.verdikt ? verdiktHtml(b.verdikt) : ''}
+      </summary>
+      <div class="slot-body">
+        ${itemKurzHtml(it)}
+        ${it.notiz ? `<p class="small">${esc(it.notiz)}</p>` : ''}
+        ${bewertungHtml(b, true)}
+        <div class="btn-row">
+          <select data-stash-slot="${esc(it.id)}" aria-label="Ziel-Slot">${slots.map(k => `<option value="${k}">${esc(SLOT_BY_KEY[k].de)}</option>`).join('')}</select>
+          <button class="btn primary" data-act="stash-anlegen" data-id="${esc(it.id)}">Anlegen</button>
+          <button class="btn" data-act="stash-edit" data-id="${esc(it.id)}">Bearbeiten</button>
+          <button class="btn danger" data-act="stash-del" data-id="${esc(it.id)}">Löschen</button>
+        </div>
+      </div>
+    </details>`;
+  }).join('');
+  return `
+    <section class="d4-panel truhe">
+      <header class="d4-titel"><div class="char-name">Truhe</div><div class="char-sub">${liste.length} Items, nicht angelegt</div></header>
+      <p class="small muted">Items aus deinem Stash, die du theoretisch nutzen könntest. Jede Karte zeigt, wo das Item in deine Builds passt.</p>
+      <div class="inv-top">
+        <label class="btn primary">📷 Screenshot → Truhe<input type="file" accept="image/*" hidden data-truhe-file></label>
+        <button class="btn" data-act="stash-manuell">Manuell erfassen</button>
+      </div>
+      <div class="truhe-grid">${karten || '<p class="small muted">Noch leer.</p>'}</div>
+    </section>`;
+}
+
+/* ---------------- Bewertung (Item prüfen / Truhe) ---------------- */
+
+function bewertungHtml(b, kompakt) {
+  const rolle = r => r === 'aktiv' ? '<span class="badge aktiv">aktiv</span>' : '<span class="badge ziel">Ziel</span>';
+  const weitere = b.regeln.slice(b.quelle === 'regel' ? 1 : 0);
+  return `<div class="bewertung">
+    ${kompakt ? '' : `<div class="res-head">${verdiktHtml(b.verdikt, true)}
+      <span class="small muted">${{ build: 'aus deinen Builds', eintrag: 'aus dem Eintrag in wissen.json', regel: `laut Regel ${esc(b.regeln[0] ? b.regeln[0].id : '')}` }[b.quelle] || 'keine passende Regel'}</span></div>`}
+    ${b.gruende.map(g => `<p class="res-reason">${esc(g)}</p>`).join('')}
+    ${b.passend.length ? `<div class="small"><b>Passt in:</b><ul class="affixe">${b.passend.map(x => `<li>${rolle(x.rolle)} ${esc(x.slot)} · ${esc(x.build)}: ${esc(x.text)}${x.art === 'profil' && x.besser ? ' <span class="tag warn">Upgrade</span>' : ''}</li>`).join('')}</ul></div>`
+      : '<p class="small muted">Passt in keinen Slot deiner beiden Builds.</p>'}
+    ${b.kodexHinweis ? `<p class="small">${esc(b.kodexHinweis)} <a href="#" data-act="goto-tab" data-tab="bestand">Kodex</a></p>` : ''}
+    ${weitere.length ? `<p class="small muted">Weitere passende Regeln: ${weitere.map(r => `${esc(r.id)} (${esc(r.verdikt || '–')})`).join(', ')}</p>` : ''}
+  </div>`;
+}
+
+/* ---------------- Ansicht: Item prüfen ---------------- */
+
+function viewPruefen() {
+  return `
+    <section class="d4-panel">
+      <header class="d4-titel"><div class="char-name">Item prüfen</div><div class="char-sub">Screenshot rein – Verdikt raus</div></header>
+      <p class="small muted">Für Items, die du gerade gefunden hast: behalten, zum Legendary umbauen, in den Würfel oder zerlegen?
+        Bewertet wird gegen deine beiden Builds (Slot, Aspekt, Zielaffixe), das getragene Item und die Regeln aus wissen.json.</p>
+      <label class="drop gross-drop" data-pruefen>
+        <input type="file" accept="image/*" hidden data-pruefen-file>
+        <b>Screenshot hier einfügen</b>
+        <span class="small muted">tippen zum Auswählen · Strg+V · hineinziehen</span>
+      </label>
+      <div class="btn-row"><button class="btn" data-act="pruefen-manuell">Werte von Hand eingeben</button></div>
+    </section>
+    ${GRENZEN_HTML}`;
 }
 
 /* ---------------- Ansicht: Bestand ---------------- */
@@ -177,7 +314,8 @@ function viewBestand() {
   const b = state.profil.bestand;
   const mats = materialEintraege(state.wissen);
   const schluessel = mats.map(e => e.bestandsschluessel);
-  const extra = Object.keys(b).filter(k => !schluessel.includes(k));
+  const runen = runenListe();
+  const extra = Object.keys(b).filter(k => !schluessel.includes(k) && !runen.some(r => norm(r) === norm(k)));
   const zeile = (key, label, e) => {
     const v = b[key];
     return `<div class="bestand-row${e && e.engpass ? ' engpass' : ''}">
@@ -196,8 +334,42 @@ function viewBestand() {
       ${extra.length ? `<h3>Weitere Schlüssel im Profil</h3><p class="small muted">Stehen in profil.bestand, aber ohne Material in wissen.json.</p>
         ${extra.map(k => zeile(k, esc(k), null)).join('')}` : ''}
       <div class="bestand-row"><input type="text" name="neu-name" placeholder="weiterer Schlüssel"><input type="text" inputmode="numeric" name="neu-wert" placeholder="Anzahl"></div>
+
+      <h3>Runen</h3>
+      <p class="small muted">Schlüssel = Runenname. Leer = unbekannt. Aus Regel-Ausnahmen, wissen.runen und den Sockeln deiner Builds.</p>
+      ${runenListe().map(r => zeile(r, esc(r), null)).join('') || '<p class="small muted">Keine Runen bekannt.</p>'}
+
+      <h3>Kodex der Macht</h3>
+      <p class="small muted">Rang eintragen. Leer = unbekannt, „-“ = nicht im Kodex. Gespeichert in profil.json → kodex.</p>
+      ${kodexListe().map((k, i) => {
+        const v = state.profil.kodex[k.key];
+        const wert = k.key in state.profil.kodex ? (v == null ? '-' : v) : '';
+        return `<div class="bestand-row"><label for="kod-${i}">${esc(k.label)}<br><span class="small muted">${esc(k.key)}</span></label>
+          <input id="kod-${i}" type="text" name="k.${esc(k.key)}" value="${esc(wert)}" placeholder="unbekannt"></div>`;
+      }).join('')}
       <button class="btn primary" type="submit">Speichern</button>
     </form>`;
+}
+
+/** Runen für den Bestand: bekannte Namen plus alle Runen aus den Sockeln beider Builds. */
+function runenListe() {
+  const namen = new Set(runenNamen(state.wissen));
+  for (const b of state.profil.builds) for (const s of SLOTS) splitParts((b.slots[s.key] || {}).sockel).forEach(x => { if (istRune(state.wissen, x)) namen.add(x); });
+  return [...namen];
+}
+/** Aspekte für den Kodex: alle Aspekte aus wissen.json plus die Zielaspekte der Builds. Schlüssel = englischer Name. */
+function kodexListe() {
+  const out = new Map();
+  for (const e of state.wissen.eintraege.filter(e => norm(e.typ) === 'aspekt')) out.set(e.name_en || e.name_de, bi(e.name_de, e.name_en));
+  for (const b of state.profil.builds) for (const s of SLOTS) {
+    const a = (b.slots[s.key] || {}).zielAspekt;
+    if (!a) continue;
+    const e = eintragZu(state.wissen, a);
+    const key = e ? (e.name_en || e.name_de) : a;
+    if (!out.has(key)) out.set(key, a);
+  }
+  Object.keys(state.profil.kodex).forEach(k => { if (!out.has(k)) out.set(k, k); });
+  return [...out].map(([key, label]) => ({ key, label }));
 }
 
 /* ---------------- Ansicht: Item-Editor ---------------- */
@@ -209,11 +381,12 @@ function schliesseInvEditor() {
 
 function oeffneInvEditor(slot, item, extra = {}) {
   schliesseInvEditor();
-  state.tab = 'inventar';
+  state.tab = extra.modus === 'pruefen' ? 'pruefen' : 'inventar';
   state.dateienOpen = false;
   state.invEditor = Object.assign({
     draft: normalizeItem(structuredClone(item || leeresItem())), slot: slot || '', slotHint: slot || '',
     vorschlag: null, bild: '', status: '', laeuft: false, roh: '', implizitHinweis: '', neu: !item,
+    modus: 'inventar',   // inventar | truhe | pruefen
   }, extra);
   render();
   window.scrollTo(0, 0);
@@ -232,17 +405,27 @@ function viewInvEditor() {
   const seltOpt = state.wissen.seltenheitSynonyme.map(s =>
     `<option value="${esc(s.id)}" ${selKanon(d.seltenheit) === s.id ? 'selected' : ''}>${esc(bi(s.name_de, s.name_en))}</option>`).join('');
   const slotOpt = SLOTS.map(s => `<option value="${s.key}" ${ed.slot === s.key ? 'selected' : ''}>${esc(s.de)}${vs && vs.key === s.key ? ' ← Vorschlag' : ''}</option>`).join('');
-  const bestehend = ed.slot && state.profil.inventar[ed.slot];
+  const bestehend = ed.modus === 'inventar' && ed.slot && state.profil.inventar[ed.slot];
+  const titel = { inventar: ed.neu ? 'Item erfassen' : 'Item bearbeiten', truhe: ed.neu ? 'Item für die Truhe' : 'Truhen-Item bearbeiten', pruefen: 'Item prüfen' }[ed.modus];
+  const bewertung = ed.modus === 'pruefen' && !ed.laeuft
+    ? bewerteItem({ item: normalizeItem(d), profil: state.profil, wissen: state.wissen, katalog: state.katalog, uebersetzung: { affixe: state.uebersetzung, itemTypen: state.uebersetzungItemTypen } }) : null;
 
   return `
-    <h2>${ed.neu ? 'Item erfassen' : 'Item bearbeiten'}</h2>
+    <h2>${titel}</h2>
+    ${bewertung ? `<div class="d4-panel verdikt-panel">${bewertungHtml(bewertung)}
+      <div class="btn-row">
+        <button class="btn" data-act="pruefen-neu">Nach Korrektur neu bewerten</button>
+        <button class="btn primary" data-act="pruefen-truhe">In die Truhe legen</button>
+        <button class="btn" data-act="pruefen-inventar">Ins Inventar übernehmen</button>
+      </div></div>` : ''}
     ${ed.status ? `<div class="msg ${ed.fehler ? 'err' : 'info'}" id="ocr-status">${esc(ed.status)}</div>` : '<div id="ocr-status"></div>'}
     ${ed.bild ? `<details class="slot" open><summary>Screenshot</summary><img class="shot" src="${ed.bild}" alt="Tooltip-Screenshot"></details>` : ''}
-    <div class="msg warn">Die Analyse nutzt nur, was du hier bestätigst – nie den rohen Erkennungstext.
-      Erst „Übernehmen“ schreibt ins Inventar.</div>
+    <div class="msg warn">${ed.modus === 'pruefen'
+      ? 'Das Verdikt nutzt die Werte unten. Weicht etwas vom Tooltip ab: korrigieren und „neu bewerten“.'
+      : 'Die Analyse nutzt nur, was du hier bestätigst – nie den rohen Erkennungstext. Erst „Übernehmen“ speichert.'}</div>
     <form id="inv-form" autocomplete="off">
-      <label class="f">Slot
-        <select name="slot" required><option value="">– bitte wählen –</option>${slotOpt}</select></label>
+      <label class="f">Slot${ed.modus === 'inventar' ? '' : ' <span class="muted">(optional)</span>'}
+        <select name="slot" ${ed.modus === 'inventar' ? 'required' : ''}><option value="">– bitte wählen –</option>${slotOpt}</select></label>
       ${vs && vs.key ? `<p class="small muted">Vorschlag: <b>${esc(SLOT_BY_KEY[vs.key].de)}</b> (${esc(vs.warum)})${ed.slotHint && ed.slotHint !== vs.key ? ` – eingefügt hast du bei <b>${esc(SLOT_BY_KEY[ed.slotHint].de)}</b>.` : ''}</p>` : ''}
       ${bestehend && ed.neu ? `<p class="small warn-text">Im gewählten Slot liegt schon „${esc(bestehend.name)}“ – Übernehmen ersetzt es.</p>` : ''}
       <div class="grid2">
@@ -254,6 +437,7 @@ function viewInvEditor() {
         <label class="f">Geprägter Aspekt<input type="text" name="aspekt" list="dl-kat-aspekte" value="${esc(d.aspekt)}"></label>
       </div>
       <label class="check-inline"><input type="checkbox" name="vermacht" ${d.vermacht ? 'checked' : ''}> vermacht (Ancestral)</label>
+      ${ed.modus === 'truhe' ? `<label class="f">Notiz<input type="text" name="notiz" value="${esc(d.notiz || '')}" placeholder="z. B. liegt in Truhe 3"></label>` : ''}
 
       <h3>Affixe <span class="small muted">– der unzuverlässigste Teil der Erkennung, bitte Zeile für Zeile prüfen</span></h3>
       ${ed.implizitHinweis ? `<div class="msg info small">${esc(ed.implizitHinweis)}</div>` : ''}
@@ -301,7 +485,9 @@ function viewInvEditor() {
       ${ed.roh ? `<details class="slot"><summary>Roh-Text der Erkennung (nur zum Vergleich)</summary><pre class="json">${esc(ed.roh)}</pre></details>` : ''}
       ${katalogDatalists()}
       <div class="btn-row" style="margin-top:14px">
-        <button type="submit" class="btn primary" ${ed.laeuft ? 'disabled' : ''}>Übernehmen</button>
+        ${ed.modus === 'pruefen'
+          ? `<button type="button" class="btn primary" data-act="pruefen-neu" ${ed.laeuft ? 'disabled' : ''}>Neu bewerten</button>`
+          : `<button type="submit" class="btn primary" ${ed.laeuft ? 'disabled' : ''}>${ed.modus === 'truhe' ? 'In die Truhe' : 'Übernehmen'}</button>`}
         <button type="button" class="btn" data-act="inv-cancel">Verwerfen</button>
       </div>
     </form>`;
@@ -354,6 +540,7 @@ function leseInvForm() {
   const g = k => String(fd.get(k) ?? '').trim();
   ed.slot = g('slot');
   for (const k of ['name', 'slug', 'seltenheit', 'itemTyp', 'aspekt', 'stand', 'quelle']) d[k] = g(k);
+  if (fd.has('notiz')) d.notiz = g('notiz');
   d.gegenstandsmacht = g('gegenstandsmacht') === '' ? '' : Number(g('gegenstandsmacht')) || g('gegenstandsmacht');
   d.vermacht = fd.get('vermacht') === 'on';
   d.affixe = d.affixe.map((a, i) => ({
@@ -367,9 +554,38 @@ function leseInvForm() {
   d.vollendung = { stufe: g('v.stufe'), max: g('v.max') };
 }
 
+/** Aktuellen Entwurf als fertiges Item (ohne OCR-Hilfsfelder). */
+function entwurfAlsItem() {
+  const d = state.invEditor.draft;
+  d.affixe = d.affixe.filter(a => a.text || a.wert);
+  const item = normalizeItem(d);
+  if (!item.stand) item.stand = today();
+  if (!item.slug && item.name) item.slug = slugify(item.name);
+  if (d.notiz) item.notiz = d.notiz;
+  return item;
+}
+
+function inTruheLegen() {
+  leseInvForm();
+  const ed = state.invEditor;
+  if (ed.draft.affixe.filter(a => a.verzaubert).length > 1) { alert('Pro Item ist nur EIN Affix verzauberbar – bitte nur eine Zeile als „verzaubert“ markieren.'); return; }
+  const item = entwurfAlsItem();
+  const liste = state.profil.stash;
+  const i = ed.stashId ? liste.findIndex(x => x.id === ed.stashId) : -1;
+  item.id = ed.stashId || ('s' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5));
+  if (i >= 0) liste[i] = item; else liste.push(item);
+  saveProfil();
+  schliesseInvEditor();
+  state.tab = 'inventar';
+  state.offen.add('stash:' + item.id);
+  render();
+  document.querySelector('.truhe')?.scrollIntoView({ block: 'start' });
+}
+
 function uebernehmeInvItem() {
   leseInvForm();
   const ed = state.invEditor;
+  if (ed.modus === 'truhe') { inTruheLegen(); return; }
   if (!ed.slot) { alert('Bitte einen Slot wählen.'); return; }
   const d = ed.draft;
   if (d.affixe.filter(a => a.verzaubert).length > 1) {
@@ -389,7 +605,9 @@ function uebernehmeInvItem() {
   const slot = ed.slot;
   schliesseInvEditor();
   render();
-  document.querySelector(`.inv-card[data-slot="${slot}"]`)?.scrollIntoView({ block: 'start' });
+  state.offen.add('slot:' + slot);
+  render();
+  document.querySelector(`.d4-slot[data-slot="${slot}"]`)?.scrollIntoView({ block: 'start' });
 }
 
 /* ---------------- Screenshot-Erkennung ---------------- */
@@ -516,9 +734,9 @@ async function vorbereiten(blob) {
   return c;
 }
 
-async function starteOcr(blob, slotHint) {
+async function starteOcr(blob, slotHint, modus = 'inventar') {
   const bild = URL.createObjectURL(blob);
-  oeffneInvEditor(slotHint, null, { bild, status: 'Lade Texterkennung …', laeuft: true });
+  oeffneInvEditor(slotHint, null, { bild, status: 'Lade Texterkennung …', laeuft: true, modus });
   state.invEditor.draft.quelle = 'ocr';
   const ed = state.invEditor;
   try {
@@ -549,7 +767,7 @@ async function starteOcr(blob, slotHint) {
     ed.status = `Erkennung fehlgeschlagen: ${err.message}. Du kannst die Felder von Hand ausfüllen.`;
   }
   ed.laeuft = false;
-  if (state.invEditor === ed && state.tab === 'inventar') render();
+  if (state.invEditor === ed && (state.tab === 'inventar' || state.tab === 'pruefen')) render();
 }
 
 function bildAus(dataTransfer) {
@@ -643,8 +861,57 @@ document.addEventListener('click', e => {
       if (!confirm(`„${p.inventar[slot].name}“ aus dem Inventar entfernen?`)) return;
       p.inventar[slot] = null; saveProfil(); render(); break;
     case 'inv-cancel':
-      if (!confirm('Entwurf verwerfen? Nichts wird ins Inventar geschrieben.')) return;
+      if (state.invEditor.modus !== 'pruefen' && !confirm('Entwurf verwerfen? Nichts wird gespeichert.')) return;
       schliesseInvEditor(); render(); break;
+    case 'alle-auf':
+    case 'alle-zu':
+      document.querySelectorAll('details.d4-slot').forEach(d => { d.open = act === 'alle-auf'; });
+      break;
+    case 'inv-in-truhe': {
+      const it = p.inventar[slot];
+      if (!confirm(`„${it.name}“ ablegen und in die Truhe legen?`)) return;
+      p.stash.push(Object.assign({}, it, { id: 's' + Date.now().toString(36) }));
+      p.inventar[slot] = null; saveProfil(); render(); break;
+    }
+    /* Truhe */
+    case 'stash-manuell': oeffneInvEditor('', null, { modus: 'truhe' }); break;
+    case 'stash-edit': {
+      const it = p.stash.find(x => x.id === el.dataset.id);
+      oeffneInvEditor('', it, { modus: 'truhe', neu: false, stashId: it.id });
+      break;
+    }
+    case 'stash-del': {
+      const i = p.stash.findIndex(x => x.id === el.dataset.id);
+      if (i < 0 || !confirm(`„${p.stash[i].name}“ aus der Truhe löschen?`)) return;
+      p.stash.splice(i, 1); saveProfil(); render(); break;
+    }
+    case 'stash-anlegen': {
+      const i = p.stash.findIndex(x => x.id === el.dataset.id);
+      const ziel = document.querySelector(`[data-stash-slot="${el.dataset.id}"]`).value;
+      const neu = p.stash[i], alt = p.inventar[ziel];
+      if (!confirm(`„${neu.name}“ in ${SLOT_BY_KEY[ziel].de} anlegen?${alt ? ` „${alt.name}“ wandert in die Truhe.` : ''}`)) return;
+      const { id, notiz, ...item } = neu;
+      p.inventar[ziel] = normalizeItem(item);
+      p.stash.splice(i, 1);
+      if (alt) p.stash.push(Object.assign({}, alt, { id: 's' + Date.now().toString(36) }));
+      saveProfil(); state.offen.add('slot:' + ziel); render(); break;
+    }
+    /* Item prüfen */
+    case 'pruefen-manuell': oeffneInvEditor('', null, { modus: 'pruefen' }); break;
+    case 'pruefen-neu': leseInvForm(); render(); break;
+    case 'pruefen-truhe': state.invEditor.modus = 'truhe'; inTruheLegen(); break;
+    case 'pruefen-inventar': {
+      leseInvForm();
+      const ed = state.invEditor;
+      if (!ed.slot) {
+        const k = kandidatenSlots(normalizeItem(ed.draft), { katalog: state.katalog, wissen: state.wissen });
+        ed.slot = k[0] || '';
+      }
+      if (!ed.slot) { alert('Bitte oben einen Slot wählen.'); return; }
+      ed.modus = 'inventar'; ed.neu = true;
+      uebernehmeInvItem();
+      break;
+    }
     case 'inv-add-affix':
       leseInvForm();
       state.invEditor.draft.affixe.push({ text: '', wert: '', gross: false, implizit: false, verzaubert: false, schwach: false, konfidenz: null });
@@ -677,11 +944,13 @@ document.addEventListener('submit', e => {
     e.preventDefault();
     const fd = new FormData(f);
     const b = {};
+    const kodex = {};
     for (const [k, v] of fd.entries()) {
-      if (!k.startsWith('b.')) continue;
       const t = String(v).trim();
-      b[k.slice(2)] = t === '' ? null : (Number(t) || 0);   // leer = unbekannt
+      if (k.startsWith('b.')) b[k.slice(2)] = t === '' ? null : (Number(t) || 0);   // leer = unbekannt
+      if (k.startsWith('k.') && t !== '') kodex[k.slice(2)] = t === '-' ? null : (Number(t) || 0);   // leer = unbekannt, „-“ = nicht im Kodex
     }
+    state.profil.kodex = kodex;
     const nn = String(fd.get('neu-name') || '').trim(), nw = String(fd.get('neu-wert') || '').trim();
     if (nn) b[nn] = Number(nw) || 0;
     state.profil.bestand = b;
@@ -690,31 +959,54 @@ document.addEventListener('submit', e => {
 });
 
 // Einfügen: Strg+V im Inventar. Slot = fokussierte/zuletzt angetippte Karte, sonst Vorschlag.
+// Auf-/Zuklappen merken (toggle blubbert nicht → Capture)
+document.addEventListener('toggle', e => {
+  const d = e.target;
+  if (!d.dataset || !d.dataset.offen) return;
+  if (d.open) state.offen.add(d.dataset.offen); else state.offen.delete(d.dataset.offen);
+}, true);
+
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (el.matches && el.matches('input[data-truhe-file]')) {
+    const f = el.files && el.files[0]; if (f) starteOcr(f, '', 'truhe'); el.value = '';
+  }
+  if (el.matches && el.matches('input[data-pruefen-file]')) {
+    const f = el.files && el.files[0]; if (f) starteOcr(f, '', 'pruefen'); el.value = '';
+  }
+});
+
+// Einfügen: Strg+V im Inventar (Slot = zuletzt angetippter Slot), in der Truhe und bei „Item prüfen“.
 document.addEventListener('focusin', e => {
-  const c = e.target.closest && e.target.closest('.inv-card');
+  const c = e.target.closest && e.target.closest('[data-slot]');
   if (c) letzterSlot = c.dataset.slot;
 });
 document.addEventListener('pointerdown', e => {
-  const c = e.target.closest && e.target.closest('.inv-card');
-  letzterSlot = c ? c.dataset.slot : (e.target.closest && e.target.closest('#main') ? '' : letzterSlot);
+  if (!e.target.closest) return;
+  const c = e.target.closest('[data-slot]');
+  letzterSlot = c ? c.dataset.slot : e.target.closest('.truhe') ? 'truhe' : e.target.closest('#main') ? '' : letzterSlot;
 });
 document.addEventListener('paste', e => {
-  if (state.tab !== 'inventar' || state.dateienOpen) return;
+  if (!['inventar', 'pruefen'].includes(state.tab) || state.dateienOpen) return;
   const f = bildAus(e.clipboardData);
   if (!f) return;
   e.preventDefault();
-  const slot = state.invEditor ? (state.invEditor.slot || state.invEditor.slotHint) : letzterSlot;
-  starteOcr(f, slot || '');
+  if (state.tab === 'pruefen') { starteOcr(f, '', 'pruefen'); return; }
+  if (state.invEditor) { starteOcr(f, state.invEditor.slot || state.invEditor.slotHint || '', state.invEditor.modus); return; }
+  if (letzterSlot === 'truhe') { starteOcr(f, '', 'truhe'); return; }
+  starteOcr(f, letzterSlot || '');
 });
 document.addEventListener('dragover', e => {
-  if (state.tab === 'inventar' && e.target.closest && e.target.closest('.inv-card, .inv-top')) e.preventDefault();
+  if (['inventar', 'pruefen'].includes(state.tab) && e.target.closest && e.target.closest('[data-slot], .inv-top, .truhe, [data-pruefen]')) e.preventDefault();
 });
 document.addEventListener('drop', e => {
-  if (state.tab !== 'inventar') return;
-  const c = e.target.closest && e.target.closest('.inv-card, .inv-top');
+  if (!['inventar', 'pruefen'].includes(state.tab) || !e.target.closest) return;
+  const c = e.target.closest('[data-slot], .inv-top, .truhe, [data-pruefen]');
   if (!c) return;
   const f = bildAus(e.dataTransfer);
   if (!f) return;
   e.preventDefault();
-  starteOcr(f, c.dataset.slot || '');
+  if (state.tab === 'pruefen') starteOcr(f, '', 'pruefen');
+  else if (c.closest('.truhe')) starteOcr(f, '', 'truhe');
+  else starteOcr(f, c.dataset.slot || '');
 });
