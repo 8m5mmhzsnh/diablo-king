@@ -1,96 +1,726 @@
 {
-  "_info": "Persönliches Profil – wird nie von einem Wissens-Update überschrieben. Beispiel: zwei leere Builds zum Ausfüllen.",
+  "_info": "Persönliche Datei. Builds, Fortschritt, Sammelliste. Wird beim Patchen von wissen.json NICHT überschrieben.",
   "schemaVersion": 2,
+  "besitzer": "Chris",
   "charakter": {
-    "name": "",
-    "klasse": "",
-    "stufe": "",
-    "notiz": "",
-    "qualstufe": 6,
-    "paragon": 139
+    "name": "Skullak",
+    "klasse": "Hexenmeister (Warlock)",
+    "spielsprache": "englisch",
+    "notiz": "Skillleiste entspricht der Starter-Variante. Items sind teilweise schon Midgame – die Uniques kamen früher als vorgesehen. Das ist kein Fehler.",
+    "stufe": 70,
+    "paragon": 139,
+    "qualstufe": 8
   },
+  "aktiverBuild": "starter",
+  "zielBuild": "midgame",
   "einstellungen": {
-    "warnTageBuildAlter": 14
+    "warnTageBuildAlter": 14,
+    "sprachausgabe": "beide"
   },
-  "inventar": {
-    "kopf": null,
-    "brust": null,
-    "haende": null,
-    "beine": null,
-    "fuesse": null,
-    "amulett": null,
-    "ring1": null,
-    "ring2": null,
-    "waffe": {
-      "name": "Elegy",
-      "slug": "elegy",
-      "seltenheit": "einzigartig",
-      "itemTyp": "Sword",
-      "gegenstandsmacht": 850,
-      "vermacht": false,
-      "aspekt": "",
-      "affixe": [
-        {
-          "text": "Willpower",
-          "wert": "",
-          "gross": false,
-          "implizit": true,
-          "verzaubert": false
-        },
-        {
-          "text": "Physical Damage Multiplier",
-          "wert": "7%",
-          "gross": false,
-          "implizit": false,
-          "verzaubert": false
-        }
-      ],
-      "sockel": [
-        {
-          "gefuellt": true,
-          "inhalt": "Ruby"
-        }
-      ],
-      "haertungen": {
-        "genutzt": 1,
-        "max": 1,
-        "affix": "Attack Speed"
-      },
-      "vollendung": {
-        "stufe": 0,
-        "max": 25
-      },
-      "stand": "2026-09-25",
-      "quelle": "ocr"
-    },
-    "fokus": null
-  },
-  "bestand": {},
   "builds": [
     {
-      "id": "aktuell",
-      "name": "Aktueller Build",
-      "klasse": "",
-      "quelleUrl": "",
-      "datum": "",
-      "notiz": "",
-      "slots": {},
+      "id": "starter",
+      "name": "Starter",
+      "klasse": "Hexenmeister (Warlock)",
+      "quelleUrl": "https://mobalytics.gg/diablo-4/builds/blazing-scream-warlock-endgame-build",
+      "datum": "2026-09-25",
+      "notiz": "Umkreisender Schrei (Orbital Scream) profitiert nicht von Angriffsgeschwindigkeit. Der Brutale Aspekt wandelt sie deshalb in Schaden um – laut Guide 250–300%. Deshalb überall Angriffstempo stapeln.",
+      "skills": [
+        "Abodian beschwören (Summon Abodian) – erzeugt Demonform, nochmal wirken beendet sie früher",
+        "Sengender Schrei: Umkreisender Schrei (Blazing Scream: Orbital Scream) – Hauptschaden",
+        "Finsteres Verlies: Kettenaura (Dark Prison: Chain Aura) – immer oben halten",
+        "Schreckensschwarm: Sengende Plage (Terror Swarm: Searing Infestation)",
+        "Tiefenschritt (Nether Step) – nochmal wirken bricht Gloomwalker ab",
+        "Befehligen des Gefallenen: Schilde aus Fleisch (Command Fallen: Meat Shields) – automatisch"
+      ],
+      "slots": {
+        "kopf": {
+          "zielItem": "Leorics Krone (Leoric's Crown)",
+          "zielAspekt": "",
+          "sockel": "Splitter der Qual + Splitter des Schwarzen Seelensteins",
+          "affixe": [
+            "Primärattribut",
+            "Angriffsgeschwindigkeit",
+            "Maximales Leben",
+            "Abklingzeitreduktion"
+          ],
+          "haertung": "Maximales Leben (Worldly Endurance)",
+          "quelle": "Questreihe / saisonale Dungeons",
+          "erledigt": false
+        },
+        "brust": {
+          "zielItem": "Verstohlenheit (Stealth)",
+          "zielAspekt": "",
+          "sockel": "Igni + Kry",
+          "affixe": [
+            "Maximales Leben",
+            "Angriffsgeschwindigkeit",
+            "Beeinträchtigungsreduktion",
+            "Ressourcenerzeugung"
+          ],
+          "haertung": "Maximales Leben (Worldly Endurance)",
+          "quelle": "Würfel: weißer Brustschutz + Tal + Eth",
+          "erledigt": false
+        },
+        "handschuhe": {
+          "zielItem": "",
+          "zielAspekt": "Aspekt des höllischen Befehlshabers (Hellbent Commander Aspect)",
+          "sockel": "",
+          "affixe": [
+            "Willenskraft",
+            "Krit-Schaden-Multiplikator",
+            "Verwundbar-Schaden-Multiplikator",
+            "Maximales Leben"
+          ],
+          "haertung": "Krit-Schaden (Worldly Finesse)",
+          "quelle": "Kodex",
+          "erledigt": false
+        },
+        "hose": {
+          "zielItem": "",
+          "zielAspekt": "Aspekt der diabolischen Rüstung (Aspect of Diabolical Armor)",
+          "sockel": "Nagu + Que",
+          "affixe": [
+            "Willenskraft",
+            "Maximales Leben",
+            "Rüstung",
+            "Widerstand gegen alle Elemente"
+          ],
+          "haertung": "Maximales Leben (Worldly Endurance)",
+          "quelle": "Kodex",
+          "erledigt": false,
+          "notiz": "Du trägst hier Temerity – das ist Midgame-Stand, also in Ordnung."
+        },
+        "stiefel": {
+          "zielItem": "",
+          "zielAspekt": "Sadistischer Aspekt (Sadistic Aspect)",
+          "sockel": "",
+          "affixe": [
+            "Willenskraft",
+            "Bewegungstempo",
+            "Maximales Leben",
+            "Ausweich-Bewegungstempo"
+          ],
+          "haertung": "Bewegungstempo (Natural Motion)",
+          "quelle": "Kodex",
+          "erledigt": false,
+          "notiz": "Kollidiert mit den Sabatons des Höllenhundes. Ausweg: Sadistic per Transfiguration aufs Amulett."
+        },
+        "amulett": {
+          "zielItem": "",
+          "zielAspekt": "Brutaler Aspekt (Brutal Aspect)",
+          "sockel": "Splitter des Schmerzes",
+          "affixe": [
+            "Angriffsgeschwindigkeit",
+            "Krit-Schaden-Multiplikator",
+            "Krit-Chance",
+            "Verwundbar-Schaden-Multiplikator"
+          ],
+          "haertung": "Krit-Schaden (Worldly Finesse)",
+          "quelle": "Kodex",
+          "erledigt": false,
+          "notiz": "Du trägst hier Moloch's – Midgame-Stand, in Ordnung."
+        },
+        "ring1": {
+          "zielItem": "Der Götze der acht Gesichter (The Eightfold Idol)",
+          "zielAspekt": "",
+          "sockel": "Splitter der Sünde",
+          "affixe": [
+            "Primärattribut",
+            "Maximales Leben",
+            "Krit-Schaden-Multiplikator",
+            "Verwundbar-Schaden-Multiplikator"
+          ],
+          "haertung": "Ressourcenkostenreduktion (Worldly Stability)",
+          "quelle": "Bestie im Eis",
+          "erledigt": true
+        },
+        "ring2": {
+          "zielItem": "",
+          "zielAspekt": "Dämonischer Aspekt (Demonic Aspect)",
+          "sockel": "Splitter der Mutter",
+          "affixe": [
+            "Willenskraft",
+            "Krit-Chance",
+            "Krit-Schaden-Multiplikator",
+            "Verwundbar-Schaden-Multiplikator"
+          ],
+          "haertung": "Krit-Schaden (Worldly Finesse)",
+          "quelle": "Kodex",
+          "erledigt": false
+        },
+        "waffe": {
+          "zielItem": "Elegie (Elegy)",
+          "zielAspekt": "",
+          "sockel": "Rubin",
+          "affixe": [
+            "Willenskraft",
+            "Ränge zu Sengender Schrei",
+            "Krit-Schaden-Multiplikator",
+            "Maximales Leben"
+          ],
+          "haertung": "Angriffsgeschwindigkeit (Worldly Destruction)",
+          "quelle": "Fürst Zir",
+          "erledigt": true,
+          "notiz": "850er vorhanden, Einzigartige Kraft auf Maximum (50%[x]). 900er über Craft Unique anvisieren."
+        },
+        "fokus": {
+          "zielItem": "Infernaler Homunkulus (Infernal Homunculus)",
+          "zielAspekt": "",
+          "sockel": "Rubin",
+          "affixe": [
+            "Willenskraft",
+            "Ränge zu Dämonologie-Fertigkeiten",
+            "Krit-Schaden-Multiplikator",
+            "Krit-Chance"
+          ],
+          "haertung": "Angriffsgeschwindigkeit (Worldly Destruction)",
+          "quelle": "Urivar",
+          "erledigt": true,
+          "notiz": "107%[x], fast Maximum."
+        }
+      },
+      "talisman": [
+        "Mlor of Abaddon's Flesh",
+        "Phoba of Abaddon's Flesh",
+        "Berú of Abaddon's Flesh",
+        "Linta of Abaddon's Flesh",
+        "Fer of Abaddon's Flesh",
+        "Wendigo Brand (Unique Charm)"
+      ],
+      "stapeln": [
+        "Angriffsgeschwindigkeit (wegen Brutalem Aspekt)",
+        "Krit-Chance",
+        "Krit-Schaden-Multiplikator",
+        "Ränge zu Höllenfeuer-/Dämonologie-/Allen Fertigkeiten"
+      ],
       "wechselkriterien": []
     },
     {
-      "id": "ziel",
-      "name": "Ziel-Build",
-      "klasse": "",
-      "quelleUrl": "",
-      "datum": "",
-      "notiz": "",
-      "slots": {},
-      "wechselkriterien": []
+      "id": "midgame",
+      "name": "Midgame",
+      "klasse": "Hexenmeister (Warlock)",
+      "quelleUrl": "https://mobalytics.gg/diablo-4/builds/blazing-scream-warlock-endgame-build",
+      "datum": "2026-09-25",
+      "notiz": "Wechsel auf Schädelspalter und Metamorphose: Zerstörungsdämon. Leben stapeln, weil Metamorphose den Schaden über das maximale Leben skaliert. Erst wechseln, wenn Gegner die Schädel überleben – also beim Pushen Richtung Qual 7/8. Schädelspalter kostet deutlich mehr Zorn.",
+      "skills": [
+        "Sengender Schrei: Schädelspalter (Blazing Scream: Skull Splitter)",
+        "Finsteres Verlies: Kettenaura (Dark Prison: Chain Aura)",
+        "Amoklauf: Dämonischer Schlag (Rampage: Demonic Smash) – nicht spammen",
+        "Metamorphose: Zerstörungsdämon (Metamorphosis: Destruction Demon) – verbrennt dich",
+        "Abodian beschwören (Summon Abodian) – nur noch Bewegung",
+        "Befehligen des Gefallenen: Schilde aus Fleisch – automatisch"
+      ],
+      "slots": {
+        "kopf": {
+          "zielItem": "Leorics Krone (Leoric's Crown)",
+          "zielAspekt": "",
+          "sockel": "Splitter der Qual + Splitter des Schwarzen Seelensteins",
+          "affixe": [
+            "Primärattribut",
+            "Angriffsgeschwindigkeit",
+            "Maximales Leben",
+            "Abklingzeitreduktion"
+          ],
+          "haertung": "Maximales Leben (Worldly Endurance)",
+          "quelle": "Baal",
+          "erledigt": false
+        },
+        "brust": {
+          "zielItem": "Verstohlenheit (Stealth)",
+          "zielAspekt": "",
+          "sockel": "Nagu + Tir",
+          "affixe": [
+            "Maximales Leben",
+            "Angriffsgeschwindigkeit",
+            "Beeinträchtigungsreduktion",
+            "Ressourcenerzeugung"
+          ],
+          "haertung": "Maximales Leben (Worldly Endurance)",
+          "quelle": "Würfel: weißer Brustschutz + Tal + Eth",
+          "erledigt": false,
+          "notiz": "Nagu + Tir lösen laut Guide alle Ressourcenprobleme."
+        },
+        "handschuhe": {
+          "zielItem": "",
+          "zielAspekt": "Aspekt des höllischen Befehlshabers (Hellbent Commander Aspect)",
+          "sockel": "",
+          "affixe": [
+            "Willenskraft",
+            "Krit-Schaden-Multiplikator",
+            "Verwundbar-Schaden-Multiplikator",
+            "Maximales Leben"
+          ],
+          "haertung": "Krit-Schaden (Worldly Finesse)",
+          "quelle": "Kodex",
+          "erledigt": false
+        },
+        "hose": {
+          "zielItem": "Verwegenheit (Temerity)",
+          "zielAspekt": "",
+          "sockel": "Mot + Cir",
+          "affixe": [
+            "Primärattribut",
+            "Maximales Leben",
+            "Rüstung",
+            "Physischer Widerstand"
+          ],
+          "haertung": "Maximales Leben (Worldly Endurance)",
+          "quelle": "Vorbote des Hasses",
+          "erledigt": true,
+          "notiz": "96% Barriere – fast Maximum."
+        },
+        "stiefel": {
+          "zielItem": "",
+          "zielAspekt": "Sadistischer Aspekt (Sadistic Aspect)",
+          "sockel": "",
+          "affixe": [
+            "Willenskraft",
+            "Bewegungstempo",
+            "Maximales Leben",
+            "Zornregeneration"
+          ],
+          "haertung": "Bewegungstempo (Natural Motion)",
+          "quelle": "Kodex",
+          "erledigt": false
+        },
+        "amulett": {
+          "zielItem": "Pulsierende Flamme des Molochs (Moloch's Beating Flame)",
+          "zielAspekt": "",
+          "sockel": "Splitter der Sünde",
+          "affixe": [
+            "Willenskraft",
+            "Krit-Schaden-Multiplikator",
+            "Verwundbar-Schaden-Multiplikator",
+            "Maximales Leben"
+          ],
+          "haertung": "Glückstreffer: Primärressource wiederherstellen (Worldly Stability)",
+          "quelle": "Der Schlächter",
+          "erledigt": true,
+          "notiz": "Willenskraft, Ränge und Einzigartige Kraft alle auf Maximum. Kein Sockel – braucht ein Zerstreutes Prisma."
+        },
+        "ring1": {
+          "zielItem": "Der Götze der acht Gesichter (The Eightfold Idol)",
+          "zielAspekt": "",
+          "sockel": "Splitter des Schmerzes",
+          "affixe": [
+            "Primärattribut",
+            "Maximales Leben",
+            "Krit-Schaden-Multiplikator",
+            "Verwundbar-Schaden-Multiplikator"
+          ],
+          "haertung": "Ressourcenkostenreduktion (Worldly Stability)",
+          "quelle": "Bestie im Eis",
+          "erledigt": true,
+          "notiz": "80%[x] – Maximalwert."
+        },
+        "ring2": {
+          "zielItem": "",
+          "zielAspekt": "Aspekt der Zündung (Aspect of Ignition)",
+          "sockel": "Splitter der Mutter",
+          "affixe": [
+            "Willenskraft",
+            "Maximales Leben",
+            "Krit-Schaden-Multiplikator",
+            "Verwundbar-Schaden-Multiplikator"
+          ],
+          "haertung": "Ressourcenkostenreduktion (Worldly Stability)",
+          "quelle": "Kodex",
+          "erledigt": false
+        },
+        "waffe": {
+          "zielItem": "Elegie (Elegy)",
+          "zielAspekt": "",
+          "sockel": "Rubin",
+          "affixe": [
+            "Willenskraft",
+            "Ränge zu Sengender Schrei",
+            "Krit-Schaden",
+            "Maximales Leben"
+          ],
+          "haertung": "Angriffsgeschwindigkeit (Worldly Destruction)",
+          "quelle": "Fürst Zir",
+          "erledigt": true
+        },
+        "fokus": {
+          "zielItem": "Infernaler Homunkulus (Infernal Homunculus)",
+          "zielAspekt": "",
+          "sockel": "Rubin",
+          "affixe": [
+            "Willenskraft",
+            "Ränge zu Dämonologie-Fertigkeiten",
+            "Krit-Schaden-Multiplikator",
+            "Krit-Chance"
+          ],
+          "haertung": "Krit-Chance (Worldly Destruction)",
+          "quelle": "Urivar",
+          "erledigt": true
+        }
+      },
+      "talisman": [
+        "Mlor of Abaddon's Flesh",
+        "Phoba of Abaddon's Flesh",
+        "Berú of Abaddon's Flesh",
+        "Linta of Abaddon's Flesh",
+        "Fer of Abaddon's Flesh",
+        "Wendigo Brand (Unique Charm)"
+      ],
+      "stapeln": [
+        "Maximales Leben (skaliert Schaden über Metamorphose)",
+        "Krit-Chance",
+        "Krit-Schaden-Multiplikator",
+        "Ränge zu Höllenfeuer-/Dämonologie-/Allen Fertigkeiten"
+      ],
+      "wechselkriterien": [
+        {
+          "text": "Elegie (Elegy)",
+          "erledigt": true
+        },
+        {
+          "text": "Infernaler Homunkulus (Infernal Homunculus)",
+          "erledigt": true
+        },
+        {
+          "text": "Pulsierende Flamme des Molochs (Moloch's Beating Flame)",
+          "erledigt": true
+        },
+        {
+          "text": "Der Götze der acht Gesichter (The Eightfold Idol)",
+          "erledigt": true
+        },
+        {
+          "text": "Verwegenheit (Temerity)",
+          "erledigt": true
+        },
+        {
+          "text": "Sadistischer Aspekt – nicht offiziell, aber ohne ihn fehlt die Heilung gegen den Verbrennungsschaden",
+          "erledigt": false
+        }
+      ]
+    },
+    {
+      "id": "endgame",
+      "name": "Endgame",
+      "klasse": "Hexenmeister (Warlock)",
+      "quelleUrl": "https://mobalytics.gg/diablo-4/builds/blazing-scream-warlock-endgame-build",
+      "datum": "2026-09-25",
+      "notiz": "Mythische Versionen aller Uniques. Enigma statt Stealth, Hand der Apotheose, Stein von Jordan. Feuerwiderstand stapeln für Stone of Jordan.",
+      "skills": [
+        "Sengender Schrei: Schädelspalter (Blazing Scream: Skull Splitter)",
+        "Finsteres Verlies: Kettenaura (Dark Prison: Chain Aura)",
+        "Amoklauf: Dämonischer Schlag (Rampage: Demonic Smash)",
+        "Metamorphose: Zerstörungsdämon (Metamorphosis: Destruction Demon)",
+        "Abodian beschwören (Summon Abodian)",
+        "Siegel der Unterwanderung: Siegel der Lava – manuell wirken für den Phoba-of-the-Nameless-Setbonus"
+      ],
+      "slots": {
+        "kopf": {
+          "zielItem": "Leorics Krone (Leoric's Crown)",
+          "zielAspekt": "",
+          "sockel": "Splitter des Schwarzen Seelensteins + Splitter der Qual",
+          "affixe": [
+            "Angriffsgeschwindigkeit",
+            "Maximales Leben",
+            "Willenskraft",
+            "Rüstung"
+          ],
+          "haertung": "Maximales Leben (Worldly Endurance)",
+          "quelle": "Baal",
+          "erledigt": false,
+          "notiz": "Splitter wirken hier doppelt so stark."
+        },
+        "brust": {
+          "zielItem": "Enigma",
+          "zielAspekt": "",
+          "sockel": "Nagu + Tir",
+          "affixe": [
+            "Ränge zu allen Fertigkeiten",
+            "Bewegungstempo",
+            "Schadensreduktion",
+            "Maximales Leben"
+          ],
+          "haertung": "Maximales Leben (Worldly Endurance)",
+          "quelle": "Würfel: weißer Brustschutz + Jah + Ith + Ber",
+          "erledigt": false
+        },
+        "handschuhe": {
+          "zielItem": "Hand der Apotheose (Hand of Apotheosis)",
+          "zielAspekt": "",
+          "sockel": "",
+          "affixe": [
+            "Primärattribut",
+            "Maximales Leben",
+            "Krit-Schaden-Multiplikator",
+            "Verwundbar-Schaden-Multiplikator"
+          ],
+          "haertung": "Krit-Schaden (Worldly Finesse)",
+          "quelle": "Bartuc",
+          "erledigt": false,
+          "notiz": "Gibt alle Metamorphose-Varianten gratis."
+        },
+        "hose": {
+          "zielItem": "Verwegenheit (Temerity)",
+          "zielAspekt": "",
+          "sockel": "Mot + Cir",
+          "affixe": [
+            "Primärattribut",
+            "Maximales Leben",
+            "Rüstung",
+            "Feuerwiderstand"
+          ],
+          "haertung": "Maximales Leben (Worldly Endurance)",
+          "quelle": "Vorbote des Hasses",
+          "erledigt": true
+        },
+        "stiefel": {
+          "zielItem": "",
+          "zielAspekt": "Unsterblicher Aspekt (Undying Aspect)",
+          "sockel": "",
+          "affixe": [
+            "Willenskraft",
+            "Bewegungstempo",
+            "Maximales Leben",
+            "Zornregeneration"
+          ],
+          "haertung": "Bewegungstempo (Natural Motion)",
+          "quelle": "Kodex",
+          "erledigt": false,
+          "notiz": "Sadistic wandert jetzt per Transfiguration aufs Amulett."
+        },
+        "amulett": {
+          "zielItem": "Pulsierende Flamme des Molochs (Moloch's Beating Flame)",
+          "zielAspekt": "Sadistischer Aspekt (transfiguriert)",
+          "sockel": "Splitter der Sünde",
+          "affixe": [
+            "Willenskraft",
+            "Krit-Schaden-Multiplikator",
+            "Verwundbar-Schaden-Multiplikator",
+            "Maximales Leben"
+          ],
+          "haertung": "Glückstreffer: Primärressource wiederherstellen (Worldly Stability)",
+          "quelle": "Der Schlächter",
+          "erledigt": true
+        },
+        "ring1": {
+          "zielItem": "Der Götze der acht Gesichter (The Eightfold Idol)",
+          "zielAspekt": "",
+          "sockel": "Splitter des Schmerzes",
+          "affixe": [
+            "Primärattribut",
+            "Maximales Leben",
+            "Krit-Schaden-Multiplikator",
+            "Verwundbar-Schaden-Multiplikator"
+          ],
+          "haertung": "Ressourcenkostenreduktion (Worldly Stability)",
+          "quelle": "Bestie im Eis",
+          "erledigt": true
+        },
+        "ring2": {
+          "zielItem": "Stein von Jordan (Stone of Jordan)",
+          "zielAspekt": "",
+          "sockel": "Rubin (Feuerwiderstand)",
+          "affixe": [
+            "Primärattribut",
+            "Ränge zu allen Fertigkeiten",
+            "Krit-Schaden-Multiplikator",
+            "Verwundbar-Schaden-Multiplikator"
+          ],
+          "haertung": "Ressourcenkostenreduktion (Worldly Stability)",
+          "quelle": "Baal",
+          "erledigt": false,
+          "notiz": "Gleicht den Mehrschaden des Schwarzen Seelensteins aus."
+        },
+        "waffe": {
+          "zielItem": "Elegie (Elegy)",
+          "zielAspekt": "",
+          "sockel": "Rubin",
+          "affixe": [
+            "Willenskraft",
+            "Ränge zu Sengender Schrei",
+            "Krit-Schaden-Multiplikator",
+            "Maximales Leben"
+          ],
+          "haertung": "Angriffsgeschwindigkeit (Worldly Destruction)",
+          "quelle": "Fürst Zir",
+          "erledigt": true
+        },
+        "fokus": {
+          "zielItem": "Infernaler Homunkulus (Infernal Homunculus)",
+          "zielAspekt": "",
+          "sockel": "Rubin",
+          "affixe": [
+            "Willenskraft",
+            "Ränge zu Dämonologie-Fertigkeiten",
+            "Krit-Schaden-Multiplikator",
+            "Krit-Chance"
+          ],
+          "haertung": "Krit-Chance (Worldly Destruction)",
+          "quelle": "Urivar",
+          "erledigt": true
+        }
+      },
+      "talisman": [
+        "Phoba of the Nameless",
+        "Phoba of Abaddon's Flesh",
+        "Berú of Abaddon's Flesh",
+        "Linta of Abaddon's Flesh",
+        "Fer of Abaddon's Flesh",
+        "Linta of the Nameless"
+      ],
+      "talismanNotiz": "Seal of the Diamond Mind gibt den 5er- und 3er-Setbonus schon mit 4 bzw. 2 Talismanen.",
+      "stapeln": [
+        "Maximales Leben",
+        "Krit-Chance",
+        "Krit-Schaden-Multiplikator",
+        "Ränge zu Höllenfeuer-/Dämonologie-/Allen Fertigkeiten",
+        "Feuerwiderstand (für Stone of Jordan)"
+      ],
+      "wechselkriterien": [
+        {
+          "text": "Leorics Krone (Leoric's Crown)",
+          "erledigt": false
+        },
+        {
+          "text": "Enigma",
+          "erledigt": false
+        },
+        {
+          "text": "Hand der Apotheose (Hand of Apotheosis)",
+          "erledigt": false
+        },
+        {
+          "text": "Stein von Jordan (Stone of Jordan)",
+          "erledigt": false
+        }
+      ]
     }
   ],
-  "aktiverBuild": "aktuell",
-  "zielBuild": "ziel",
-  "sammelliste": [],
-  "offeneAufgaben": [],
-  "abweichungen": []
+  "sammelliste": [
+    {
+      "name_de": "Weißes Einhandschwert",
+      "name_en": "White one-handed sword",
+      "notiz": "Craft Unique – Chance auf 900er Elegie. Vermachte Basis bevorzugen."
+    },
+    {
+      "name_de": "Weißer Brustschutz",
+      "name_en": "White chest armor",
+      "notiz": "Stealth (Tal + Eth), später Enigma (Jah + Ith + Ber)."
+    },
+    {
+      "name_de": "Seltener Helm",
+      "name_en": "Rare helm",
+      "notiz": "Upgrade to Legendary mit Pragmatischem Abstimmungsprisma – Weg zum Sadistischen Aspekt."
+    },
+    {
+      "name_de": "Seltener Ring",
+      "name_en": "Rare ring",
+      "notiz": "Upgrade to Legendary – Aspekt der Zündung / Dämonischer Aspekt."
+    },
+    {
+      "name_de": "Zerstreutes Prisma",
+      "name_en": "Scattered Prism",
+      "notiz": "Größter Engpass. Ohne Sockel im Schmuck kein einziger Splitter."
+    },
+    {
+      "name_de": "Maske des Richters",
+      "name_en": "Judicator's Mask",
+      "notiz": "Noch 2 bis zur Fünf."
+    },
+    {
+      "name_de": "Unterschlupfschlüssel",
+      "name_en": "Lair Key",
+      "notiz": "Höllenflut ist die dichteste Quelle."
+    },
+    {
+      "name_de": "Talisman-Zauber",
+      "name_en": "Talisman charms",
+      "notiz": "Alle aufheben, nichts filtern."
+    }
+  ],
+  "offeneAufgaben": [
+    {
+      "text": "Sadistischen Aspekt beschaffen – Kodex prüfen, sonst Upgrade to Legendary mit Pragmatischem Abstimmungsprisma auf seltenem Helm",
+      "erledigt": false
+    },
+    {
+      "text": "Stealth craften – weißer Brustschutz + Tal + Eth",
+      "erledigt": false
+    },
+    {
+      "text": "Zerstreute Prismen farmen",
+      "erledigt": false
+    },
+    {
+      "text": "Kriegsplan-Quest: 4 Eskalationsserien + Astaroth",
+      "erledigt": false
+    },
+    {
+      "text": "6-Platz-Siegel – legendäre 5-Platz-Siegel 3 zu 1 oder Horadrim-Tribute in der Unterstadt",
+      "erledigt": false
+    },
+    {
+      "text": "900er Elegie – Versuche mit Verbessertem Urstaub auf weißen Schwertern",
+      "erledigt": false
+    },
+    {
+      "text": "Leorics Krone prüfen – laut Starter-Guide evtl. schon aus der Questreihe vorhanden",
+      "erledigt": false
+    }
+  ],
+  "abweichungen": [
+    {
+      "thema": "Runen Brustschutz",
+      "mobalytics": "Igni + Kry (Starter), Nagu + Tir (Midgame/Endgame)",
+      "vitablo": "Nagu + Que",
+      "entscheidung": "Mobalytics – der gewählte Build."
+    },
+    {
+      "thema": "Runen Hose",
+      "mobalytics": "Nagu + Que (Starter), Mot + Cir (Midgame/Endgame)",
+      "vitablo": "Eth + Ith",
+      "entscheidung": "Mobalytics."
+    },
+    {
+      "thema": "Härtung Elegie",
+      "mobalytics": "Angriffsgeschwindigkeit",
+      "vitablo": "Feuerschaden",
+      "entscheidung": "Mobalytics."
+    },
+    {
+      "thema": "Splitter des Höllenfeuers",
+      "mobalytics": "kommt nicht vor",
+      "vitablo": "Amulett in der T1-12-Variante",
+      "entscheidung": "Mobalytics – der Build stapelt Krit."
+    },
+    {
+      "thema": "Stiefel",
+      "mobalytics": "Sadistischer Aspekt",
+      "vitablo": "Sabatons des Höllenhundes",
+      "entscheidung": "Offen. Ausweg: Sadistic per Transfiguration aufs Amulett."
+    },
+    {
+      "thema": "Quelle Leorics Krone",
+      "starter": "Questreihe und saisonale Dungeons",
+      "endgame": "Baal, alternativ Diablo/Mephisto",
+      "entscheidung": "Zuerst in der eigenen Truhe nachschauen."
+    }
+  ],
+  "bestand": {
+    "Scattered Prism": 0,
+    "Pure Primordial Dust": 3,
+    "Enhanced Primordial Dust": 8,
+    "Refined Primordial Dust": 26,
+    "Pragmatic Tuning Prism": 8,
+    "Obducite": 873,
+    "Forgotten Souls": 164,
+    "Scroll of Restoration": 0,
+    "Infused Horadric Resin": 517,
+    "Nightmare Sigil": 0,
+    "Lair Key": 0,
+    "Greater Lair Key": 0,
+    "Exquisite Blood": 0,
+    "Judicator's Mask": 3
+  },
+  "_hinweisBestand": "Selbst gepflegt. Fehlt ein Schlüssel oder steht er auf null, gilt der Bestand als unbekannt und Warnungen erscheinen. Verknüpfung über 'bestandsschluessel' in wissen.json.",
+  "inventar": {}
 }

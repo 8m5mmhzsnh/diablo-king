@@ -1,0 +1,202 @@
+{
+  "_info": "Einzelner Build als importierbare Vorlage. Fortschritt (erledigt-Haekchen) ist zurueckgesetzt - der wird nach dem Import in profil.json gefuehrt.",
+  "schemaVersion": 2,
+  "typ": "build",
+  "stand": "2026-09-25",
+  "build": {
+    "id": "endgame",
+    "name": "Endgame",
+    "klasse": "Hexenmeister (Warlock)",
+    "quelleUrl": "https://mobalytics.gg/diablo-4/builds/blazing-scream-warlock-endgame-build",
+    "datum": "2026-09-25",
+    "notiz": "Mythische Versionen aller Uniques. Enigma statt Stealth, Hand der Apotheose, Stein von Jordan. Feuerwiderstand stapeln für Stone of Jordan.",
+    "skills": [
+      "Sengender Schrei: Schädelspalter (Blazing Scream: Skull Splitter)",
+      "Finsteres Verlies: Kettenaura (Dark Prison: Chain Aura)",
+      "Amoklauf: Dämonischer Schlag (Rampage: Demonic Smash)",
+      "Metamorphose: Zerstörungsdämon (Metamorphosis: Destruction Demon)",
+      "Abodian beschwören (Summon Abodian)",
+      "Siegel der Unterwanderung: Siegel der Lava – manuell wirken für den Phoba-of-the-Nameless-Setbonus"
+    ],
+    "slots": {
+      "kopf": {
+        "zielItem": "Leorics Krone (Leoric's Crown)",
+        "zielAspekt": "",
+        "sockel": "Splitter des Schwarzen Seelensteins + Splitter der Qual",
+        "affixe": [
+          "Angriffsgeschwindigkeit",
+          "Maximales Leben",
+          "Willenskraft",
+          "Rüstung"
+        ],
+        "haertung": "Maximales Leben (Worldly Endurance)",
+        "quelle": "Baal",
+        "erledigt": false,
+        "notiz": "Splitter wirken hier doppelt so stark."
+      },
+      "brust": {
+        "zielItem": "Enigma",
+        "zielAspekt": "",
+        "sockel": "Nagu + Tir",
+        "affixe": [
+          "Ränge zu allen Fertigkeiten",
+          "Bewegungstempo",
+          "Schadensreduktion",
+          "Maximales Leben"
+        ],
+        "haertung": "Maximales Leben (Worldly Endurance)",
+        "quelle": "Würfel: weißer Brustschutz + Jah + Ith + Ber",
+        "erledigt": false
+      },
+      "handschuhe": {
+        "zielItem": "Hand der Apotheose (Hand of Apotheosis)",
+        "zielAspekt": "",
+        "sockel": "",
+        "affixe": [
+          "Primärattribut",
+          "Maximales Leben",
+          "Krit-Schaden-Multiplikator",
+          "Verwundbar-Schaden-Multiplikator"
+        ],
+        "haertung": "Krit-Schaden (Worldly Finesse)",
+        "quelle": "Bartuc",
+        "erledigt": false,
+        "notiz": "Gibt alle Metamorphose-Varianten gratis."
+      },
+      "hose": {
+        "zielItem": "Verwegenheit (Temerity)",
+        "zielAspekt": "",
+        "sockel": "Mot + Cir",
+        "affixe": [
+          "Primärattribut",
+          "Maximales Leben",
+          "Rüstung",
+          "Feuerwiderstand"
+        ],
+        "haertung": "Maximales Leben (Worldly Endurance)",
+        "quelle": "Vorbote des Hasses",
+        "erledigt": false
+      },
+      "stiefel": {
+        "zielItem": "",
+        "zielAspekt": "Unsterblicher Aspekt (Undying Aspect)",
+        "sockel": "",
+        "affixe": [
+          "Willenskraft",
+          "Bewegungstempo",
+          "Maximales Leben",
+          "Zornregeneration"
+        ],
+        "haertung": "Bewegungstempo (Natural Motion)",
+        "quelle": "Kodex",
+        "erledigt": false,
+        "notiz": "Sadistic wandert jetzt per Transfiguration aufs Amulett."
+      },
+      "amulett": {
+        "zielItem": "Pulsierende Flamme des Molochs (Moloch's Beating Flame)",
+        "zielAspekt": "Sadistischer Aspekt (transfiguriert)",
+        "sockel": "Splitter der Sünde",
+        "affixe": [
+          "Willenskraft",
+          "Krit-Schaden-Multiplikator",
+          "Verwundbar-Schaden-Multiplikator",
+          "Maximales Leben"
+        ],
+        "haertung": "Glückstreffer: Primärressource wiederherstellen (Worldly Stability)",
+        "quelle": "Der Schlächter",
+        "erledigt": false
+      },
+      "ring1": {
+        "zielItem": "Der Götze der acht Gesichter (The Eightfold Idol)",
+        "zielAspekt": "",
+        "sockel": "Splitter des Schmerzes",
+        "affixe": [
+          "Primärattribut",
+          "Maximales Leben",
+          "Krit-Schaden-Multiplikator",
+          "Verwundbar-Schaden-Multiplikator"
+        ],
+        "haertung": "Ressourcenkostenreduktion (Worldly Stability)",
+        "quelle": "Bestie im Eis",
+        "erledigt": false
+      },
+      "ring2": {
+        "zielItem": "Stein von Jordan (Stone of Jordan)",
+        "zielAspekt": "",
+        "sockel": "Rubin (Feuerwiderstand)",
+        "affixe": [
+          "Primärattribut",
+          "Ränge zu allen Fertigkeiten",
+          "Krit-Schaden-Multiplikator",
+          "Verwundbar-Schaden-Multiplikator"
+        ],
+        "haertung": "Ressourcenkostenreduktion (Worldly Stability)",
+        "quelle": "Baal",
+        "erledigt": false,
+        "notiz": "Gleicht den Mehrschaden des Schwarzen Seelensteins aus."
+      },
+      "waffe": {
+        "zielItem": "Elegie (Elegy)",
+        "zielAspekt": "",
+        "sockel": "Rubin",
+        "affixe": [
+          "Willenskraft",
+          "Ränge zu Sengender Schrei",
+          "Krit-Schaden-Multiplikator",
+          "Maximales Leben"
+        ],
+        "haertung": "Angriffsgeschwindigkeit (Worldly Destruction)",
+        "quelle": "Fürst Zir",
+        "erledigt": false
+      },
+      "fokus": {
+        "zielItem": "Infernaler Homunkulus (Infernal Homunculus)",
+        "zielAspekt": "",
+        "sockel": "Rubin",
+        "affixe": [
+          "Willenskraft",
+          "Ränge zu Dämonologie-Fertigkeiten",
+          "Krit-Schaden-Multiplikator",
+          "Krit-Chance"
+        ],
+        "haertung": "Krit-Chance (Worldly Destruction)",
+        "quelle": "Urivar",
+        "erledigt": false
+      }
+    },
+    "talisman": [
+      "Phoba of the Nameless",
+      "Phoba of Abaddon's Flesh",
+      "Berú of Abaddon's Flesh",
+      "Linta of Abaddon's Flesh",
+      "Fer of Abaddon's Flesh",
+      "Linta of the Nameless"
+    ],
+    "talismanNotiz": "Seal of the Diamond Mind gibt den 5er- und 3er-Setbonus schon mit 4 bzw. 2 Talismanen.",
+    "stapeln": [
+      "Maximales Leben",
+      "Krit-Chance",
+      "Krit-Schaden-Multiplikator",
+      "Ränge zu Höllenfeuer-/Dämonologie-/Allen Fertigkeiten",
+      "Feuerwiderstand (für Stone of Jordan)"
+    ],
+    "wechselkriterien": [
+      {
+        "text": "Leorics Krone (Leoric's Crown)",
+        "erledigt": false
+      },
+      {
+        "text": "Enigma",
+        "erledigt": false
+      },
+      {
+        "text": "Hand der Apotheose (Hand of Apotheosis)",
+        "erledigt": false
+      },
+      {
+        "text": "Stein von Jordan (Stone of Jordan)",
+        "erledigt": false
+      }
+    ]
+  }
+}

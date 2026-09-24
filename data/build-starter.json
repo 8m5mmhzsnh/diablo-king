@@ -1,0 +1,184 @@
+{
+  "_info": "Einzelner Build als importierbare Vorlage. Fortschritt (erledigt-Haekchen) ist zurueckgesetzt - der wird nach dem Import in profil.json gefuehrt.",
+  "schemaVersion": 2,
+  "typ": "build",
+  "stand": "2026-09-25",
+  "build": {
+    "id": "starter",
+    "name": "Starter",
+    "klasse": "Hexenmeister (Warlock)",
+    "quelleUrl": "https://mobalytics.gg/diablo-4/builds/blazing-scream-warlock-endgame-build",
+    "datum": "2026-09-25",
+    "notiz": "Umkreisender Schrei (Orbital Scream) profitiert nicht von Angriffsgeschwindigkeit. Der Brutale Aspekt wandelt sie deshalb in Schaden um – laut Guide 250–300%. Deshalb überall Angriffstempo stapeln.",
+    "skills": [
+      "Abodian beschwören (Summon Abodian) – erzeugt Demonform, nochmal wirken beendet sie früher",
+      "Sengender Schrei: Umkreisender Schrei (Blazing Scream: Orbital Scream) – Hauptschaden",
+      "Finsteres Verlies: Kettenaura (Dark Prison: Chain Aura) – immer oben halten",
+      "Schreckensschwarm: Sengende Plage (Terror Swarm: Searing Infestation)",
+      "Tiefenschritt (Nether Step) – nochmal wirken bricht Gloomwalker ab",
+      "Befehligen des Gefallenen: Schilde aus Fleisch (Command Fallen: Meat Shields) – automatisch"
+    ],
+    "slots": {
+      "kopf": {
+        "zielItem": "Leorics Krone (Leoric's Crown)",
+        "zielAspekt": "",
+        "sockel": "Splitter der Qual + Splitter des Schwarzen Seelensteins",
+        "affixe": [
+          "Primärattribut",
+          "Angriffsgeschwindigkeit",
+          "Maximales Leben",
+          "Abklingzeitreduktion"
+        ],
+        "haertung": "Maximales Leben (Worldly Endurance)",
+        "quelle": "Questreihe / saisonale Dungeons",
+        "erledigt": false
+      },
+      "brust": {
+        "zielItem": "Verstohlenheit (Stealth)",
+        "zielAspekt": "",
+        "sockel": "Igni + Kry",
+        "affixe": [
+          "Maximales Leben",
+          "Angriffsgeschwindigkeit",
+          "Beeinträchtigungsreduktion",
+          "Ressourcenerzeugung"
+        ],
+        "haertung": "Maximales Leben (Worldly Endurance)",
+        "quelle": "Würfel: weißer Brustschutz + Tal + Eth",
+        "erledigt": false
+      },
+      "handschuhe": {
+        "zielItem": "",
+        "zielAspekt": "Aspekt des höllischen Befehlshabers (Hellbent Commander Aspect)",
+        "sockel": "",
+        "affixe": [
+          "Willenskraft",
+          "Krit-Schaden-Multiplikator",
+          "Verwundbar-Schaden-Multiplikator",
+          "Maximales Leben"
+        ],
+        "haertung": "Krit-Schaden (Worldly Finesse)",
+        "quelle": "Kodex",
+        "erledigt": false
+      },
+      "hose": {
+        "zielItem": "",
+        "zielAspekt": "Aspekt der diabolischen Rüstung (Aspect of Diabolical Armor)",
+        "sockel": "Nagu + Que",
+        "affixe": [
+          "Willenskraft",
+          "Maximales Leben",
+          "Rüstung",
+          "Widerstand gegen alle Elemente"
+        ],
+        "haertung": "Maximales Leben (Worldly Endurance)",
+        "quelle": "Kodex",
+        "erledigt": false,
+        "notiz": ""
+      },
+      "stiefel": {
+        "zielItem": "",
+        "zielAspekt": "Sadistischer Aspekt (Sadistic Aspect)",
+        "sockel": "",
+        "affixe": [
+          "Willenskraft",
+          "Bewegungstempo",
+          "Maximales Leben",
+          "Ausweich-Bewegungstempo"
+        ],
+        "haertung": "Bewegungstempo (Natural Motion)",
+        "quelle": "Kodex",
+        "erledigt": false,
+        "notiz": "Kollidiert mit den Sabatons des Höllenhundes. Ausweg: Sadistic per Transfiguration aufs Amulett."
+      },
+      "amulett": {
+        "zielItem": "",
+        "zielAspekt": "Brutaler Aspekt (Brutal Aspect)",
+        "sockel": "Splitter des Schmerzes",
+        "affixe": [
+          "Angriffsgeschwindigkeit",
+          "Krit-Schaden-Multiplikator",
+          "Krit-Chance",
+          "Verwundbar-Schaden-Multiplikator"
+        ],
+        "haertung": "Krit-Schaden (Worldly Finesse)",
+        "quelle": "Kodex",
+        "erledigt": false,
+        "notiz": ""
+      },
+      "ring1": {
+        "zielItem": "Der Götze der acht Gesichter (The Eightfold Idol)",
+        "zielAspekt": "",
+        "sockel": "Splitter der Sünde",
+        "affixe": [
+          "Primärattribut",
+          "Maximales Leben",
+          "Krit-Schaden-Multiplikator",
+          "Verwundbar-Schaden-Multiplikator"
+        ],
+        "haertung": "Ressourcenkostenreduktion (Worldly Stability)",
+        "quelle": "Bestie im Eis",
+        "erledigt": false
+      },
+      "ring2": {
+        "zielItem": "",
+        "zielAspekt": "Dämonischer Aspekt (Demonic Aspect)",
+        "sockel": "Splitter der Mutter",
+        "affixe": [
+          "Willenskraft",
+          "Krit-Chance",
+          "Krit-Schaden-Multiplikator",
+          "Verwundbar-Schaden-Multiplikator"
+        ],
+        "haertung": "Krit-Schaden (Worldly Finesse)",
+        "quelle": "Kodex",
+        "erledigt": false
+      },
+      "waffe": {
+        "zielItem": "Elegie (Elegy)",
+        "zielAspekt": "",
+        "sockel": "Rubin",
+        "affixe": [
+          "Willenskraft",
+          "Ränge zu Sengender Schrei",
+          "Krit-Schaden-Multiplikator",
+          "Maximales Leben"
+        ],
+        "haertung": "Angriffsgeschwindigkeit (Worldly Destruction)",
+        "quelle": "Fürst Zir",
+        "erledigt": false,
+        "notiz": ""
+      },
+      "fokus": {
+        "zielItem": "Infernaler Homunkulus (Infernal Homunculus)",
+        "zielAspekt": "",
+        "sockel": "Rubin",
+        "affixe": [
+          "Willenskraft",
+          "Ränge zu Dämonologie-Fertigkeiten",
+          "Krit-Schaden-Multiplikator",
+          "Krit-Chance"
+        ],
+        "haertung": "Angriffsgeschwindigkeit (Worldly Destruction)",
+        "quelle": "Urivar",
+        "erledigt": false,
+        "notiz": ""
+      }
+    },
+    "talisman": [
+      "Mlor of Abaddon's Flesh",
+      "Phoba of Abaddon's Flesh",
+      "Berú of Abaddon's Flesh",
+      "Linta of Abaddon's Flesh",
+      "Fer of Abaddon's Flesh",
+      "Wendigo Brand (Unique Charm)"
+    ],
+    "stapeln": [
+      "Angriffsgeschwindigkeit (wegen Brutalem Aspekt)",
+      "Krit-Chance",
+      "Krit-Schaden-Multiplikator",
+      "Ränge zu Höllenfeuer-/Dämonologie-/Allen Fertigkeiten"
+    ],
+    "wechselkriterien": []
+  }
+}
