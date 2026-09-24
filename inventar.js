@@ -40,6 +40,7 @@ function analysenFuerSlot(slotKey) {
   const run = (build, anderer) => analysiereSlot({
     slotKey, item: p.inventar[slotKey], build, andererBuild: anderer,
     charakter: p.charakter, bestand: p.bestand, wissen: state.wissen,
+    katalog: state.katalog, uebersetzung: state.uebersetzung,
   });
   const out = [];
   if (ab) out.push({ rolle: 'aktiv', build: ab, r: run(ab, zb) });
@@ -439,6 +440,37 @@ async function holeWorker() {
 }
 
 /**
+ * Symbol vor einer Zeile anhand der Farbe erkennen: Das Verzauberungs-Symbol (Kreispfeile) ist blau,
+ * die normale Raute grau. Geprüft wird der Bereich links vom Zeilenanfang im Originalbild.
+ * @returns {'verzaubert'|null}
+ */
+function symbolAusFarbe(farbe, bbox) {
+  if (!farbe || !bbox) return null;
+  const { x0, y0, y1 } = bbox;
+  const h = y1 - y0;
+  if (h <= 0) return null;
+  const xa = Math.max(0, Math.round(x0 - 1.6 * h)), xb = Math.min(farbe.width, Math.round(x0 + 0.6 * h));
+  const ya = Math.max(0, Math.round(y0 + 0.1 * h)), yb = Math.min(farbe.height, Math.round(y1 - 0.1 * h));
+  let blau = 0, bunt = 0;
+  for (let y = ya; y < yb; y++) {
+    for (let x = xa; x < xb; x++) {
+      const i = (y * farbe.width + x) * 4;
+      const r = farbe.data[i] / 255, g = farbe.data[i + 1] / 255, b = farbe.data[i + 2] / 255;
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      if (mx < 0.45 || (mx - mn) / mx < 0.35) continue;
+      bunt++;
+      let hue;
+      if (mx === r) hue = 60 * (((g - b) / (mx - mn)) % 6);
+      else if (mx === g) hue = 60 * ((b - r) / (mx - mn) + 2);
+      else hue = 60 * ((r - g) / (mx - mn) + 4);
+      if (hue < 0) hue += 360;
+      if (hue >= 170 && hue <= 260) blau++;
+    }
+  }
+  return blau >= 60 && blau >= 0.25 * bunt ? 'verzaubert' : null;
+}
+
+/**
  * Tooltip für die Texterkennung vorbereiten.
  * D4-Tooltips haben hellen, farbigen Text (weiß, grau, orange, blau) auf dunklem, verlaufendem Grund.
  * Pro Pixel zählt der hellste Farbkanal – so bleibt auch orangefarbener Text hell –, dann trennt ein
@@ -454,6 +486,7 @@ async function vorbereiten(blob) {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(bmp, 0, 0, c.width, c.height);
   const img = ctx.getImageData(0, 0, c.width, c.height);
+  c.farbe = new ImageData(new Uint8ClampedArray(img.data), c.width, c.height);   // Originalfarben für die Symbol-Erkennung
   const px = img.data, n = px.length / 4;
   const hell = new Uint8Array(n), hist = new Array(256).fill(0);
   for (let i = 0; i < n; i++) {
@@ -498,7 +531,7 @@ async function starteOcr(blob, slotHint) {
     setOcrStatus('Erkenne Text …');
     const { data } = await worker.recognize(canvas);
     if (state.invEditor !== ed) return;   // inzwischen verworfen
-    const lines = (data.lines || []).map(l => ({ text: l.text, confidence: l.confidence }));
+    const lines = (data.lines || []).map(l => ({ text: l.text, confidence: l.confidence, symbol: symbolAusFarbe(canvas.farbe, l.bbox) }));
     const r = parseTooltip(lines, { wissen: state.wissen, katalog: state.katalog, inventar: state.profil.inventar });
     ed.draft = r.item;
     ed.vorschlag = r.slot;

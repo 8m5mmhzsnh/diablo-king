@@ -14,6 +14,7 @@ const FILES = {
   profilLeer: 'data/profil-leer.json',
   katalog: 'data/katalog.json',
   vorlagen: 'data/builds/index.json',
+  uebersetzungen: 'data/uebersetzungen.json',
 };
 const LS = {
   wissen: 'd4k2.wissen',            // Arbeitskopie wissen.json
@@ -21,6 +22,7 @@ const LS = {
   wissenLokal: 'd4k2.wissenLokal',  // true, wenn in der App am Wissen etwas geändert wurde
   profil: 'd4k2.profil',
   katalog: 'd4k2.katalog',
+  uebersetzungen: 'd4k2.uebersetzungen',
   altBuilds: 'd4k.builds', altAktiv: 'd4k.aktiv', altZiel: 'd4k.ziel',  // Schema 1
 };
 
@@ -101,6 +103,8 @@ const state = {
   eintragEditor: null,    // { index, draft }
   dateienOpen: false,
   katalog: { uniques: [] },
+  uebersetzung: {},
+  uebersetzungQuelle: '',
   katalogQuelle: '',
   invEditor: null,        // Item-Entwurf (OCR oder manuell), wird erst mit „Übernehmen“ Inventar
 };
@@ -257,6 +261,14 @@ async function loadKatalog() {
     state.katalogQuelle = k ? 'Arbeitskopie im Browser' : `nicht geladen (${r.error})`;
   }
   state.katalog = Object.assign({}, k || {});
+}
+/** Deutsch → Englisch für den Affix-Vergleich (optional). */
+async function loadUebersetzungen() {
+  const r = await fetchJson(FILES.uebersetzungen);
+  let u = r.ok ? r.data : lsGet(LS.uebersetzungen, null);
+  if (r.ok) lsSet(LS.uebersetzungen, u);
+  state.uebersetzung = (u && u.affixe) || {};
+  state.uebersetzungQuelle = r.ok ? FILES.uebersetzungen : u ? 'Arbeitskopie im Browser' : `nicht geladen (${r.error})`;
 }
 function katalogZusammenfassung() {
   const kat = state.katalog.kategorien;
@@ -1464,6 +1476,10 @@ function viewDateien() {
       <br><span class="muted">Vorschlagslisten und Namensprüfung im Item-Editor (Uniques, Aspekte, Item-Typen, Affixe).
         Implizite Affixe werden nur vormarkiert, wenn ein Unique num_inherents hat.</span></div>
 
+    <h2>uebersetzungen.json <span class="muted small">Deutsch → Englisch für Affixe</span></h2>
+    <div class="kv small"><span class="k">Quelle:</span> ${esc(state.uebersetzungQuelle)} · ${Object.keys(state.uebersetzung).length} Begriffe
+      <br><span class="muted">Damit „Willenskraft“ im Build zu „Willpower“ im Tooltip passt. Fehlende Begriffe meldet die Analyse als „nicht vergleichbar“.</span></div>
+
     <h2>profil.json <span class="muted small">persönlich</span></h2>
     <div class="kv small">
       <span class="k">Quelle:</span> ${esc(state.profilQuelle)} · <span class="k">Schema:</span> ${esc(p.schemaVersion ?? '–')}<br>
@@ -1772,6 +1788,7 @@ document.addEventListener('submit', e => {
     await loadWissen();
     await loadProfil();
     await loadKatalog();
+    await loadUebersetzungen();
     pruefeSchema();
     buildIndex();
   } catch (err) {
