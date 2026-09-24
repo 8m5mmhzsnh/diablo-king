@@ -126,13 +126,15 @@ function itemKurzHtml(it) {
   ].filter(Boolean).join('');
   const aff = it.affixe.map(a => `<li class="${a.gross ? 'gross' : ''}${a.verzaubert ? ' verz' : ''}">${a.wert ? `<b>${esc(a.wert)}</b> ` : ''}${esc(a.text)}
     ${a.implizit ? '<span class="mini">impl.</span>' : ''}${a.gross ? '<span class="mini gross">groß</span>' : ''}${a.verzaubert ? '<span class="mini verz">verz.</span>' : ''}${a.schwach ? '<span class="mini">schwach</span>' : ''}</li>`).join('');
-  const sock = it.sockel.length ? it.sockel.map(s => s.gefuellt && s.inhalt ? esc(s.inhalt) : '<i>leer</i>').join(', ') : 'keiner';
+  const sock = it.sockel.length ? it.sockel.map(s => s.gefuellt && s.inhalt
+    ? (s.inhalt === '?' ? `<span class="warn-text" title="${esc(s.effekt || '')}">belegt, Inhalt unbekannt</span>` : esc(s.inhalt)) : '<i>leer</i>').join(', ') : 'keiner';
   return `<div class="item-kopf r-${raritaet(it)}">
       <div class="item-name">${esc(it.name || '(ohne Namen)')} ${it.stand ? staleIcon(it.stand) : ''}</div>
       <div class="item-typ">${esc([seltenheitAnzeige(selKanon(it.seltenheit)), it.itemTyp].filter(Boolean).join(' · '))}</div>
     </div>
     <div>${tags}</div>
     ${it.aspekt ? `<div class="item-aspekt">★ ${esc(it.aspekt)}</div>` : ''}
+    ${it.effekt ? `<div class="item-effekt">${esc(it.effekt)}</div>` : ''}
     ${aff ? `<ul class="affixe">${aff}</ul>` : '<p class="small muted">Keine Affixe erfasst.</p>'}
     <div class="kv small">
       <span class="k">Sockel:</span> ${sock} ·
@@ -213,7 +215,7 @@ function viewInventar() {
         <label class="btn primary">📷 Screenshot<input type="file" accept="image/*" hidden data-inv-file=""></label>
         <button class="btn" data-act="alle-auf">Alle aufklappen</button>
         <button class="btn" data-act="alle-zu">Alle zuklappen</button>
-        <span class="small muted">Strg+V fügt überall ein – der Slot wird vorgeschlagen.</span>
+        <span class="small muted" id="einfuege-ziel">Strg+V → Slot wird vorgeschlagen</span>
       </div>
       <div class="charsheet-grid">
         <div class="charsheet-col">${LINKS.map(slotKarte).join('')}</div>
@@ -266,10 +268,12 @@ function viewTruhe() {
     <section class="d4-panel truhe">
       <header class="d4-titel"><div class="char-name">Truhe</div><div class="char-sub">${liste.length} Items, nicht angelegt</div></header>
       <p class="small muted">Items aus deinem Stash, die du theoretisch nutzen könntest. Jede Karte zeigt, wo das Item in deine Builds passt.</p>
-      <div class="inv-top">
-        <label class="btn primary">📷 Screenshot → Truhe<input type="file" accept="image/*" hidden data-truhe-file></label>
-        <button class="btn" data-act="stash-manuell">Manuell erfassen</button>
-      </div>
+      <label class="drop truhe-drop${letzterSlot === 'truhe' ? ' aktiv' : ''}" tabindex="0">
+        <input type="file" accept="image/*" hidden data-truhe-file>
+        <b>Screenshot für die Truhe hier einfügen</b>
+        <span class="small muted">hier antippen, dann Strg+V · oder Bild auswählen · oder hineinziehen</span>
+      </label>
+      <div class="btn-row"><button class="btn" data-act="stash-manuell">Manuell erfassen</button></div>
       <div class="truhe-grid">${karten || '<p class="small muted">Noch leer.</p>'}</div>
     </section>`;
 }
@@ -437,6 +441,8 @@ function viewInvEditor() {
         <label class="f">Geprägter Aspekt<input type="text" name="aspekt" list="dl-kat-aspekte" value="${esc(d.aspekt)}"></label>
       </div>
       <label class="check-inline"><input type="checkbox" name="vermacht" ${d.vermacht ? 'checked' : ''}> vermacht (Ancestral)</label>
+      <label class="f">Effekt (Aspekt bzw. Unique-Kraft – so wie im Tooltip, nur zur Anzeige)
+        <textarea name="effekt" rows="3">${esc(d.effekt || '')}</textarea></label>
       ${ed.modus === 'truhe' ? `<label class="f">Notiz<input type="text" name="notiz" value="${esc(d.notiz || '')}" placeholder="z. B. liegt in Truhe 3"></label>` : ''}
 
       <h3>Affixe <span class="small muted">– der unzuverlässigste Teil der Erkennung, bitte Zeile für Zeile prüfen</span></h3>
@@ -465,9 +471,11 @@ function viewInvEditor() {
       <h3>Sockel</h3>
       ${d.sockel.map((s, i) => `<div class="add-row">
         <label class="check-inline"><input type="checkbox" name="s.${i}.gefuellt" ${s.gefuellt ? 'checked' : ''}> gefüllt</label>
-        <input type="text" name="s.${i}.inhalt" value="${esc(s.inhalt)}" placeholder="Inhalt, z. B. Edelstein">
+        <input type="text" name="s.${i}.inhalt" value="${esc(s.inhalt)}" placeholder="Inhalt, z. B. Splitter oder Edelstein" list="dl-sockel">
         <button type="button" class="icon-btn" data-act="inv-del-sockel" data-i="${i}" aria-label="Sockel löschen">×</button>
       </div>`).join('') || '<p class="small muted">Kein Sockel.</p>'}
+      ${d.sockel.some(s => s.effekt) ? `<div class="small muted">${d.sockel.map((s, i) => s.effekt ? `Sockel ${i + 1} laut Tooltip: „${esc(s.effekt)}“` : '').filter(Boolean).join('<br>')}</div>` : ''}
+      <datalist id="dl-sockel">${state.wissen.eintraege.filter(e => ['splitter', 'edelstein', 'rune'].includes(norm(e.typ))).map(e => `<option value="${esc(e.name_de || e.name_en)}">`).join('')}${runenNamen(state.wissen).map(r => `<option value="${esc(r)}">`).join('')}</datalist>
       <button type="button" class="btn" data-act="inv-add-sockel">+ Sockel</button>
 
       <h3>Härtungen &amp; Vollendung</h3>
@@ -541,6 +549,7 @@ function leseInvForm() {
   ed.slot = g('slot');
   for (const k of ['name', 'slug', 'seltenheit', 'itemTyp', 'aspekt', 'stand', 'quelle']) d[k] = g(k);
   if (fd.has('notiz')) d.notiz = g('notiz');
+  if (fd.has('effekt')) d.effekt = g('effekt');
   d.gegenstandsmacht = g('gegenstandsmacht') === '' ? '' : Number(g('gegenstandsmacht')) || g('gegenstandsmacht');
   d.vermacht = fd.get('vermacht') === 'on';
   d.affixe = d.affixe.map((a, i) => ({
@@ -549,7 +558,7 @@ function leseInvForm() {
     implizit: fd.get(`a.${i}.implizit`) === 'on', gross: fd.get(`a.${i}.gross`) === 'on',
     verzaubert: fd.get(`a.${i}.verzaubert`) === 'on', schwach: fd.get(`a.${i}.schwach`) === 'on',
   }));
-  d.sockel = d.sockel.map((s, i) => ({ gefuellt: fd.get(`s.${i}.gefuellt`) === 'on', inhalt: g(`s.${i}.inhalt`) }));
+  d.sockel = d.sockel.map((s, i) => Object.assign({ gefuellt: fd.get(`s.${i}.gefuellt`) === 'on', inhalt: g(`s.${i}.inhalt`) }, s.effekt ? { effekt: s.effekt } : {}));
   d.haertungen = { genutzt: g('h.genutzt'), max: g('h.max'), affix: g('h.affix') };
   d.vollendung = { stufe: g('v.stufe'), max: g('v.max') };
 }
@@ -750,7 +759,7 @@ async function starteOcr(blob, slotHint, modus = 'inventar') {
     const { data } = await worker.recognize(canvas);
     if (state.invEditor !== ed) return;   // inzwischen verworfen
     const lines = (data.lines || []).map(l => ({ text: l.text, confidence: l.confidence, symbol: symbolAusFarbe(canvas.farbe, l.bbox) }));
-    const r = parseTooltip(lines, { wissen: state.wissen, katalog: state.katalog, inventar: state.profil.inventar });
+    const r = parseTooltip(lines, { wissen: state.wissen, katalog: state.katalog, inventar: state.profil.inventar, uebersetzung: state.uebersetzungDatei });
     ed.draft = r.item;
     ed.vorschlag = r.slot;
     ed.roh = r.roh;
@@ -978,14 +987,25 @@ document.addEventListener('change', e => {
 
 // Einfügen: Strg+V im Inventar (Slot = zuletzt angetippter Slot), in der Truhe und bei „Item prüfen“.
 document.addEventListener('focusin', e => {
-  const c = e.target.closest && e.target.closest('[data-slot]');
+  if (!e.target.closest) return;
+  const c = e.target.closest('[data-slot]');
   if (c) letzterSlot = c.dataset.slot;
+  else if (e.target.closest('.truhe')) letzterSlot = 'truhe';
+  zeigeEinfuegeZiel();
 });
 document.addEventListener('pointerdown', e => {
   if (!e.target.closest) return;
   const c = e.target.closest('[data-slot]');
   letzterSlot = c ? c.dataset.slot : e.target.closest('.truhe') ? 'truhe' : e.target.closest('#main') ? '' : letzterSlot;
+  zeigeEinfuegeZiel();
 });
+/** Zeigt, wohin Strg+V gerade einfügt (Slot, Truhe oder „Slot wird vorgeschlagen“). */
+function zeigeEinfuegeZiel() {
+  document.querySelector('.truhe-drop')?.classList.toggle('aktiv', letzterSlot === 'truhe');
+  document.querySelectorAll('.d4-slot').forEach(d => d.classList.toggle('einfuege-ziel', d.dataset.slot === letzterSlot));
+  const z = document.getElementById('einfuege-ziel');
+  if (z) z.textContent = letzterSlot === 'truhe' ? 'Strg+V → Truhe' : letzterSlot && SLOT_BY_KEY[letzterSlot] ? `Strg+V → ${SLOT_BY_KEY[letzterSlot].de}` : 'Strg+V → Slot wird vorgeschlagen';
+}
 document.addEventListener('paste', e => {
   if (!['inventar', 'pruefen'].includes(state.tab) || state.dateienOpen) return;
   const f = bildAus(e.clipboardData);

@@ -219,7 +219,7 @@ const AKTION_MATERIAL = {
 
 function leeresItem() {
   return {
-    name: '', slug: '', seltenheit: '', itemTyp: '', gegenstandsmacht: '', vermacht: false, aspekt: '',
+    name: '', slug: '', seltenheit: '', itemTyp: '', gegenstandsmacht: '', vermacht: false, aspekt: '', effekt: '',
     affixe: [], sockel: [],
     haertungen: { genutzt: 0, max: 0, affix: '' },
     vollendung: { stufe: 0, max: 25 },
@@ -239,7 +239,8 @@ function normalizeItem(it) {
     gross: !!a.gross, implizit: !!a.implizit, verzaubert: !!a.verzaubert, schwach: !!a.schwach,
   })).filter(a => a.text || a.wert);
   b.sockel = asArray(b.sockel).map(s => (typeof s === 'string' ? { gefuellt: !!s, inhalt: s } : s))
-    .map(s => ({ gefuellt: !!(s.gefuellt || s.inhalt), inhalt: String(s.inhalt || '').trim() }));
+    .map(s => Object.assign({ gefuellt: !!(s.gefuellt || s.inhalt), inhalt: String(s.inhalt || '').trim() }, s.effekt ? { effekt: String(s.effekt) } : {}));
+  b.effekt = String(b.effekt || '');
   const h = b.haertungen || {};
   b.haertungen = { genutzt: zahl(h.genutzt, 0), max: zahl(h.max, 0), affix: String(h.affix || '') };
   const v = b.vollendung || {};
@@ -450,6 +451,14 @@ function analysiereSlot({ slotKey, item, build, andererBuild, charakter, bestand
   for (const req of soll) {
     const hit = ist.find(s => s.frei && s.gefuellt && s.inhalt && textPasst(s.inhalt, req));
     if (hit) hit.frei = false; else offen.push(req);
+  }
+  // Belegte Sockel, deren Inhalt nicht erkannt wurde („?“): könnten der gesuchte Inhalt sein → nichts empfehlen
+  const unbekannt = ist.filter(s => s.frei && s.gefuellt && /^\?/.test(s.inhalt));
+  for (const u of unbekannt) {
+    const req = offen.shift();
+    if (!req) break;
+    u.frei = false;
+    info('sockel', `Sockel belegt, Inhalt nicht erkannt${u.effekt ? ` („${u.effekt.slice(0, 60)}…“)` : ''}. Ist es „${req}“? Dann im Item eintragen – bis dahin keine Empfehlung.`, 'unsicher');
   }
   for (const req of offen) {
     const splitter = istSplitter(wissen, req);
@@ -733,6 +742,37 @@ function wortOcrGleich(x, y) {
   return b.length >= 5 && distanz(a, b) <= (b.length >= 9 ? 2 : 1);
 }
 
+/**
+ * Unscharfer Namensabgleich über Wörter: „Fmelechs Beating Flaie“ ≈ „Moloch's Beating Flame“
+ * (2 von 3 Wörtern passen). Nur eindeutige Treffer mit mindestens 60 % der Wörter.
+ */
+function namenWortAbgleich(text, namen) {
+  const t = kompakt(text);
+  let best = null, bestScore = 0, gleich = false;
+  for (const n of namen) {
+    const k = kompakt(n);
+    if (k.length < 2) continue;
+    const treffer = k.filter(w => t.some(x => wortOcrGleich(x, w) || (w.length >= 4 && distanz(ocrForm(x), ocrForm(w)) <= 1))).length;
+    const score = treffer / k.length;
+    if (treffer < 2 || score < 0.6) continue;
+    if (score > bestScore) { best = n; bestScore = score; gleich = false; } else if (score === bestScore && norm(n) !== norm(best)) gleich = true;
+  }
+  return gleich ? null : best;
+}
+
+/** Sockelinhalt aus einem Effekttext: Name im Text oder Stichworte aus uebersetzungen.json → sockelEffekte. */
+function sockelAusEffekt(text, { wissen, uebersetzung } = {}) {
+  const n = norm(text);
+  const kandidaten = asArray(wissen && wissen.eintraege).filter(e => ['splitter', 'edelstein', 'rune'].includes(norm(e.typ)));
+  const e = kandidaten.find(x => [x.name_de, x.name_en].some(k => k && hasWords(n, norm(k))));
+  if (e) return e.name_de || e.name_en;
+  const tab = (uebersetzung && uebersetzung.sockelEffekte) || {};
+  for (const [name, worte] of Object.entries(tab)) {
+    if (asArray(worte).length && asArray(worte).every(w => phraseIn(n, norm(w)))) return name;
+  }
+  return null;
+}
+
 /** Findet einen bekannten Namen als zusammenhängende Wortfolge in verrauschtem OCR-Text („iy STEALTH FE“ → Stealth). */
 function namenInText(text, namen) {
   const t = kompakt(text);
@@ -756,7 +796,7 @@ function ocrZeile(t) {
   return String(t || '')
     .replace(/\+?\s*\[[^\]]*\]\s*%?/g, ' ')           // +[83 - 99], [1,016 - 1,225], [30 - 50]%, [x]
     .replace(/\+?\s*\[[^\]]*$/g, ' ')                  // umgebrochen: „[14 -“ am Zeilenende
-    .replace(/^[^\[]*\]\s*%?/g, ' ')                   // umgebrochen: „24]%“ am Zeilenanfang
+    .replace(/^\s*[\d.,\s-]*\]\s*%?/, ' ')              // umgebrochen: „24]%“ am Zeilenanfang (nur Zahlenreste)
     .replace(/[\[\]{}|\\¦]/g, ' ')
     .replace(/[©®™¢¥£€§¤°º¹²³@#^~`´¨«»<>$]/g, ' ')    // typische Fehlglyphen (Icons, Gold-Symbol)
     .replace(/\s+/g, ' ')
@@ -772,7 +812,9 @@ function aspektAusName(name, { wissen, katalog } = {}) {
   const kandidaten = [...new Set([...katalogAspekte, ...wissenAspekte.map(e => String(e.name_en || '').replace(/\s*aspect\s*|\s*aspekt\s*/ig, ' ').replace(/^of /i, '').trim())])]
     .filter(Boolean).map(a => ({ a, t: kompakt(a) })).filter(x => x.t.length).sort((x, y) => y.t.length - x.t.length);
   for (const { a, t } of kandidaten) {
-    if (t.length <= nt.length && t.every((x, k) => wortOcrGleich(nt[k], x))) return aspektAnzeige(a, wissenAspekte);
+    for (let off = 0; off <= Math.min(2, nt.length - t.length); off++) {
+      if (t.every((x, k) => wortOcrGleich(nt[off + k], x))) return aspektAnzeige(a, wissenAspekte);
+    }
     const of = nt.indexOf('of');
     if (of >= 0 && t.length === nt.length - of - 1 && t.every((x, k) => wortOcrGleich(nt[of + 1 + k], x))) return aspektAnzeige(a, wissenAspekte);
   }
@@ -800,7 +842,7 @@ function itemTypAus(text, katalog) {
  * es wird im Formular angezeigt und erst nach Bestätigung übernommen.
  * @param {{text: string, confidence?: number, symbol?: 'verzaubert'|null}[]} lines
  */
-function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
+function parseTooltip(lines, { wissen, katalog, inventar, uebersetzung } = {}) {
   const roh = asArray(lines)
     .map(l => (typeof l === 'string' ? { text: l, confidence: null } : l))
     .map(l => ({ roh: String(l.text || '').replace(/\s+/g, ' ').trim(), confidence: l.confidence == null ? null : Math.round(l.confidence), symbol: l.symbol || null }));
@@ -854,14 +896,18 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
     ...asArray(wissen && wissen.eintraege).filter(e => ['unique', 'mythisch', 'mythic', 'runenwort', 'runeword'].includes(norm(e.typ))).flatMap(e => [e.name_en, e.name_de]),
     ...katalogListe(katalog, 'uniques').map(u => u.name_en),
   ].filter(Boolean);
-  const gefunden = unique && item.name ? (namenInText(item.name, bekannte) || (namenAbgleich(item.name, bekannte, 0.25) || {}).name) : null;
+  const gefunden = unique && item.name
+    ? (namenInText(item.name, bekannte) || (namenAbgleich(item.name, bekannte, 0.25) || {}).name || namenWortAbgleich(item.name, bekannte)) : null;
   if (gefunden) {
     if (norm(gefunden) !== norm(item.name)) hinweise.push(`Name „${item.name}“ als „${gefunden}“ erkannt (Wissen/Katalog) – bitte prüfen.`);
     item.name = gefunden;
   } else if (item.name) {
     // Wörter mit Satzzeichen/Rauschen raus, Groß/Klein normalisieren
-    item.name = item.name.split(' ').filter(w => /\p{L}{2,}/u.test(w)).join(' ')
-      .toLowerCase().replace(/(^|\s)\p{L}/gu, m => m.toUpperCase());
+    const worte = item.name.split(' ').filter(w => /\p{L}{2,}/u.test(w));
+    // Kurze Rauschwörter am Anfang/Ende weg („Lg Sadistic Doom Casque“)
+    while (worte.length > 1 && worte[0].replace(/[^\p{L}]/gu, '').length <= 2) worte.shift();
+    while (worte.length > 1 && worte[worte.length - 1].replace(/[^\p{L}]/gu, '').length <= 2) worte.pop();
+    item.name = worte.join(' ').toLowerCase().replace(/(^|\s)\p{L}/gu, m => m.toUpperCase());
     if (!unique) {
       const asp = aspektAusName(item.name, { wissen, katalog });
       if (asp) { item.aspekt = asp; hinweise.push(`Aspekt „${asp}“ aus dem Item-Namen abgeleitet – bitte prüfen.`); }
@@ -872,6 +918,10 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
   const katalogAffixe = katalogListe(katalog, 'affixe').map(a => a.name_en).filter(Boolean);
   let modus = 'kopf';        // kopf → affixe → effekt → fuss
   let letztes = null;
+  const absaetze = [];       // Effekt-Absätze: [0] = Aspekt/Unique-Kraft/Runenwort, danach z. B. Sockel-Effekte
+  const neuerAbsatz = t => absaetze.push(t.replace(/^(imprinted|geprägt|aufgeprägt|unique power|einzigartige kraft)\s*:\s*/i, ''));
+  let flavor = false;
+  let ersteAffixZeile = true;
   for (let i = typIdx >= 0 ? typIdx + 1 : 1; i < clean.length; i++) {
     const l = clean[i];
     const t = l.text;
@@ -896,8 +946,14 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
     const runen = ohneBullet.match(RE_RUNEN_SOCKEL);
     if (runen) runen[1].split(/(?=[A-Z])/).forEach(r => item.sockel.push({ gefuellt: true, inhalt: r }));
     // Effekt-Absatz (Aspekt, Unique-Kraft, Runenwort): bis zu den Fußzeilen ist nichts mehr ein Affix
-    if (RE_EFFEKT.test(ohneBullet)) { modus = 'effekt'; letztes = null; continue; }
-    if (modus === 'effekt') continue;
+    if (RE_EFFEKT.test(ohneBullet)) { modus = 'effekt'; letztes = null; neuerAbsatz(ohneBullet); continue; }
+    if (modus === 'effekt') {
+      if (/^["„“]/.test(t) || flavor) { flavor = true; continue; }          // Zitat/Flavor-Text am Ende
+      // Neuer Absatz, wenn die Zeile mit einem Symbol beginnt (◆, Sockel-Icon …) und ein Satz folgt
+      if (/^[^\p{L}\p{N}"'(|]{1,3}\s+\p{Lu}/u.test(l.roh) && absaetze.length) neuerAbsatz(ohneBullet);
+      else if (absaetze.length) absaetze[absaetze.length - 1] += ' ' + ohneBullet;
+      continue;
+    }
     const istAffix = RE_AFFIX_START.test(ohneBullet) || /^(lucky hit|glückstreffer)\s*:/i.test(ohneBullet);
     // Fortsetzung einer umgebrochenen Affixzeile: kurz, ohne Zahl, ohne Satzende
     if (letztes && !istAffix && ohneBullet.split(' ').length <= 3 && !/\d|[.!?]$/.test(ohneBullet)) {
@@ -905,22 +961,39 @@ function parseTooltip(lines, { wissen, katalog, inventar } = {}) {
       continue;
     }
     if (!istAffix) {
-      // Langer Satz ohne Wert nach den Affixen = Effekttext (z. B. Unique-Kraft)
-      if (modus === 'affixe' && ohneBullet.length > 30) modus = 'effekt';
+      // Effekttext (z. B. Unique-Kraft): Zeile mit Symbol und einem Satz statt Wert, oder ein langer Satz
+      const mitSymbol = l.stern || /^[^\p{L}\p{N}"'(|]{1,3}\s*\p{Lu}/u.test(l.roh);
+      if (modus === 'affixe' && (mitSymbol || ohneBullet.length > 30)) { modus = 'effekt'; neuerAbsatz(ohneBullet); }
       continue;
     }
     modus = 'affixe';
     const m = ohneBullet.match(RE_AFFIX_START);
     const text = (m ? m[2] : ohneBullet).replace(/(\s+[\d.,]+%?)+$/, '').replace(/[+\-%\s]+$/, '').trim();
     if (!/\p{L}{2,}/u.test(text)) { letztes = null; continue; }   // nur Zahlenreste
+    // Implizite Zeile: erste Wertzeile ohne Aufzählungszeichen und ohne „+“ (z. B. „157 All Resist“ bei Schmuck)
+    const ohneSymbol = !RE_OCR_BULLET.test(l.roh) && !RE_STERN.test(l.roh) && !l.stern;
+    const implizit = ersteAffixZeile && ohneSymbol && m && !/^[+x×]/i.test(m[1].trim());
+    ersteAffixZeile = false;
     const a = {
       text, wert: m ? m[1].replace(/\s+/g, '').replace(/^×/, 'x') : '',
-      gross: !!l.stern, implizit: false, verzaubert: l.symbol === 'verzaubert', schwach: false,
+      gross: !!l.stern, implizit, verzaubert: l.symbol === 'verzaubert', schwach: false,
       konfidenz: l.confidence, lang: ohneBullet.length > 70, roh: l.roh,
     };
     affixe.push(a);
     letztes = a;
   }
+
+  // Effekt-Absätze: der erste ist Aspekt/Unique-Kraft/Runenwort, weitere mit Symbol meist Sockel-Effekte
+  if (absaetze.length) item.effekt = absaetze[0].replace(/\s+/g, ' ').trim();
+  for (const abs of absaetze.slice(1)) {
+    const text = abs.replace(/\s+/g, ' ').trim();
+    const name = sockelAusEffekt(text, { wissen, uebersetzung });
+    item.sockel.push({ gefuellt: true, inhalt: name || '?', effekt: text });
+    hinweise.push(name
+      ? `Sockel: „${name}“ am Effekttext erkannt – bitte prüfen.`
+      : 'Ein Sockel ist belegt, der Inhalt steht im Tooltip nur als Effekt. Bitte den Namen im Sockel-Feld eintragen (statt „?“).');
+  }
+  if (affixe.some(a => a.implizit)) hinweise.push('Erste Zeile ohne Aufzählungszeichen als „implizit“ markiert – bitte prüfen.');
 
   // Affixnamen mit dem Katalog abgleichen
   for (const a of affixe) {
@@ -1135,8 +1208,10 @@ function wasFehlt({ profil, wissen, katalog, uebersetzung }) {
       // c) Sockelinhalte (ohne Runen) und d) Runen
       const soll = splitParts(sl.sockel).map(x => x.replace(/\s*\([^)]*\)\s*$/, '').trim()).filter(Boolean);
       const ist = asArray(it && it.sockel).filter(x => x.gefuellt && x.inhalt).map(x => x.inhalt);
+      let unbekannt = ist.filter(x => /^\?/.test(x)).length;   // belegt, Inhalt nicht erkannt → könnte passen
       for (const req of soll) {
-        const drin = ist.some(x => textPasst(x, req));
+        let drin = ist.some(x => textPasst(x, req));
+        if (!drin && unbekannt > 0 && !istRune(wissen, req)) { unbekannt--; drin = true; }
         if (istRune(wissen, req)) {
           if (!drin) runenInBuild.set(norm(req), { name: req, n: (runenInBuild.get(norm(req)) || { n: 0 }).n + 1, slots: [...((runenInBuild.get(norm(req)) || {}).slots || []), s.de] });
           continue;
@@ -1355,7 +1430,7 @@ if (typeof module !== 'undefined' && module.exports) {
     katalogListe, eintragZu, AKTION_MATERIAL, material, materialEintraege, farbeCss, pruefeIntegritaet,
     leeresItem, normalizeItem, normalizeInventar, bestandVon, engpassListe, istEngpass,
     reihenfolgeNotiz, STANDARD_REIHENFOLGE, KATEGORIE_LABEL, analysiereSlot, PRIO_RANG, TEXT,
-    slotVorschlag, parseTooltip, ocrZeile, aspektAusName, namenAbgleich, namenInText, distanz, itemTypAus,
+    slotVorschlag, parseTooltip, ocrZeile, namenWortAbgleich, sockelAusEffekt, aspektAusName, namenAbgleich, namenInText, distanz, itemTypAus,
     affixVarianten, affixPasst, affixVergleichbar, affixAnzeige,
     runenNamen, istRune, runenKette, runenBedarf, wasFehlt, gruppiereNachQuelle, sortiereNachPrioritaet, farmzieleFuer, kodexRang,
     profilRoute, ASPEKT_RANG_HINWEIS, kandidatenSlots, regelFuerItem, bewerteItem, itemTypVarianten,

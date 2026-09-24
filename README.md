@@ -144,10 +144,12 @@ Ist der Stand älter als `profil.einstellungen.warnTageBuildAlter`, erscheint �
   - **Bildaufbereitung:** Pro Pixel zählt der hellste Farbkanal, damit auch oranger und blauer Text hell bleibt. Ein Schwellwert nach Otsu macht daraus schwarzen Text auf weißem Grund.
   - **Layout:** Tesseract erkennt das Seitenlayout automatisch (PSM 3). Das hält Item-Bild und Rahmen vom Text getrennt.
   - **Aufräumen:** Der Parser entfernt Fehlglyphen (◆ wird oft zu `o`/`¢`, das Gold-Icon zu `®`) und Bereichsangaben wie `[83 - 99]`.
-  - **Effekttexte:** Der Absatz nach „Imprinted:“ und Unique-Kräfte zählen nicht als Affixe.
+  - **Effekttexte:** Der Absatz nach „Imprinted:“ (Aspekt-Effekt) und die Unique-Kraft zählen nicht als Affixe. Der erste Effekt-Absatz wird als `effekt` am Item gespeichert und in Orange angezeigt. Beschreibungstext in Anführungszeichen wird übersprungen.
+  - **Implizite Zeile:** Die erste Wertzeile ohne Aufzählungszeichen und ohne „+“ (z. B. „157 All Resist“ auf Amuletten) wird als implizit vormarkiert.
+  - **Gefüllte Sockel:** Weitere Effekt-Absätze gehören zu Sockelinhalten. Die App erkennt sie am Namen oder an Stichworten aus `uebersetzungen.json → sockelEffekte` (z. B. „You are Unhindered“ → Splitter der Mutter). Ist der Inhalt nicht zuzuordnen, gilt der Sockel als „belegt, Inhalt unbekannt“, und die App schlägt dafür nichts vor.
   - **Fußzeilen:** „Requires Level“, „Sell Value“ und „Durability“ werden übersprungen; „Tempers: 3/3“ wird trotzdem gelesen.
   - **Katalog-Abgleich:** Affixnamen werden mit `katalog.json` abgeglichen. Typische OCR-Fehler wie „Thoms“ werden zu „Thorns“ korrigiert und markiert.
-  - **Aspekt:** Bei legendären Items leitet die App den Aspekt aus dem Namen ab („Sadistic Doom Casque“ → Sadistischer Aspekt).
+  - **Aspekt:** Bei legendären Items leitet die App den Aspekt aus dem Namen ab („Sadistic Doom Casque“ → Sadistischer Aspekt), auch wenn davor OCR-Rauschen steht („Lg Sadistic …“). Der Tooltip zeigt nur den Effekt, der Build nennt den Aspektnamen. Deshalb zählt für den Abgleich der Name, der Effekttext dient der Kontrolle.
   - **Große Affixe:** Ein Stern vor einer Affixzeile merkt sie als „groß“ vor.
   - **Verzaubert:** Das blaue Kreissymbol vor einer Zeile wird über die Farbe erkannt und merkt die Zeile als „verzaubert“ vor.
   - **Uniques und Runenwörter:** Der Name wird im verrauschten Titel gesucht („iy STEALTH FE“ → Stealth). Runenwort- und Unique-Absätze zählen nicht als Affixe. Runen im Sockel („CirOhm (300/600)“) werden zu Sockelinhalten.
@@ -205,9 +207,9 @@ Engpässe sind Materialien mit `engpass: true`. Falls es eine Sektion `wissen.en
 "inventar": {
   "waffe": {
     "name": "", "slug": "", "seltenheit": "", "itemTyp": "", "gegenstandsmacht": 0,
-    "vermacht": false, "aspekt": "",
+    "vermacht": false, "aspekt": "", "effekt": "",
     "affixe": [{ "text": "", "wert": "", "gross": false, "implizit": false, "verzaubert": false, "schwach": false }],
-    "sockel": [{ "gefuellt": false, "inhalt": "" }],
+    "sockel": [{ "gefuellt": false, "inhalt": "", "effekt": "" }],   // inhalt "?" = belegt, unbekannt
     "haertungen": { "genutzt": 0, "max": 0, "affix": "" },
     "vollendung": { "stufe": 0, "max": 25 },
     "stand": "YYYY-MM-DD", "quelle": "ocr"            // oder "manuell"
@@ -266,7 +268,8 @@ Englische Item-Typen werden über `uebersetzungen.json → itemTypen` auf die de
 
 ## Truhe (Stash)
 
-Unten im Inventar: Items, die nicht angelegt sind, aber zur Verfügung stehen (`profil.stash`, gleiche Struktur wie Inventar-Items plus `id` und `notiz`). Jede Karte zeigt ihr Verdikt und wo sie in deine Builds passt. **Anlegen** tauscht mit dem Slot, das bisherige Item wandert in die Truhe.
+Unten im Inventar: Items, die nicht angelegt sind, aber zur Verfügung stehen (`profil.stash`, gleiche Struktur wie Inventar-Items plus `id` und `notiz`). Jede Karte zeigt ihr Verdikt und wo sie in deine Builds passt.
+Screenshots kommen über das Feld „Screenshot für die Truhe hier einfügen“ hinein: antippen, dann Strg+V, oder Bild wählen bzw. hineinziehen. Neben den Inventar-Knöpfen steht immer, wohin Strg+V gerade einfügt. **Anlegen** tauscht mit dem Slot, das bisherige Item wandert in die Truhe.
 
 ## Tests
 

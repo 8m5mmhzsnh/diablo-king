@@ -281,6 +281,7 @@ async function loadUebersetzungen() {
   if (r.ok) lsSet(LS.uebersetzungen, u);
   state.uebersetzung = (u && u.affixe) || {};
   state.uebersetzungItemTypen = (u && u.itemTypen) || {};
+  state.uebersetzungDatei = u || {};
   state.uebersetzungQuelle = r.ok ? FILES.uebersetzungen : u ? 'Arbeitskopie im Browser' : `nicht geladen (${r.error})`;
 }
 function katalogZusammenfassung() {

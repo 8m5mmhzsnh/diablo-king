@@ -1,5 +1,5 @@
 {
-  "_info": "Deutsch → englische Affixnamen für den Vergleich von Build-Vorgaben (deutsch) mit Tooltips (englisch). Rechts steht der Name wie in katalog.json. Fehlt ein Begriff, meldet die App ihn als „nicht vergleichbar“ und schlägt dafür nichts vor. „Primärattribut“ ist eingebaut: passt auf Strength, Dexterity, Intelligence oder Willpower (oder auf charakter.primaerattribut, falls gesetzt). „itemTypen“: englischer Tooltip-Typ → deutsche Bezeichnung, wie sie die Regeln in wissen.json verwenden.",
+  "_info": "Deutsch → englische Affixnamen für den Vergleich von Build-Vorgaben (deutsch) mit Tooltips (englisch). Rechts steht der Name wie in katalog.json. Fehlt ein Begriff, meldet die App ihn als „nicht vergleichbar“ und schlägt dafür nichts vor. „Primärattribut“ ist eingebaut: passt auf Strength, Dexterity, Intelligence oder Willpower (oder auf charakter.primaerattribut, falls gesetzt). „itemTypen“: englischer Tooltip-Typ → deutsche Bezeichnung, wie sie die Regeln in wissen.json verwenden. „sockelEffekte“: Sockelinhalt → Stichworte aus dem englischen Tooltip-Effekt (alle müssen vorkommen); der Tooltip nennt bei Splittern oft nur den Effekt, nicht den Namen.",
   "schemaVersion": 2,
   "affixe": {
     "Willenskraft": "Willpower",
@@ -49,5 +49,11 @@
     "Focus": "Fokus",
     "Shield": "Schild",
     "Totem": "Totem"
+  },
+  "sockelEffekte": {
+    "Splitter der Mutter": [
+      "You are Unhindered",
+      "Touching enemies makes them Vulnerable"
+    ]
   }
 }
